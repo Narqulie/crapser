@@ -12,6 +12,7 @@ export class Game {
   reset() {
     this.money = 100;
     this.bet = 10;
+    this.minBet = 5;
     this.point = null;
     this.phase = 'COME_OUT';
     this.rolling = false;
@@ -119,7 +120,7 @@ export class Game {
   }
 
   setBet(amount) {
-    this.bet = Math.min(Math.max(5, amount), 100);
+    this.bet = Math.min(Math.max(this.minBet || 5, amount), 100);
   }
 
 }

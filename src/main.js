@@ -9,7 +9,9 @@ import { RGBShiftShader } from 'three/addons/shaders/RGBShiftShader.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import { createWorld, createDieBody, isSettled, hoverDie, launchDie } from './physics.js';
 import { createDie, getTopFace } from './dice.js';
-import { Game } from './game.js';
+import { RogueRun } from './rogue-run.js';
+import { RogueUI } from './rogue-ui.js';
+import { MetaProgress } from './meta-progress.js';
 import { UI } from './ui.js';
 import { AudioManager } from './audio.js';
 import { callAnnouncement, callDead } from './announcer.js';
@@ -287,20 +289,26 @@ dice.forEach((d, i) => {
   });
 });
 
-const game = new Game();
+const meta = new MetaProgress();
+const rogueRun = new RogueRun(meta);
+rogueRun.resetRun(meta.getBonuses()); // apply meta bonuses for initial run
+const game = rogueRun.game;
 const npcPool = new NPCPool();
 const ui = new UI(game, npcPool);
-ui.onNewGame = () => {
-  game.reset();
+const rogueUI = new RogueUI(rogueRun);
+rogueUI.onNewRun = () => {
+  const bonuses = meta.getBonuses();
+  rogueRun.resetRun(bonuses);
   npcPool.reset();
   pot.clear();
-  ui.hideGameOver();
   dice.forEach((d, i) => {
     d.hitWall = false;
     hoverDie(d.body, i);
   });
   ui.sync();
+  rogueUI.sync();
 };
+rogueUI.sync();
 let settleCount = 0;
 let resultPending = false;
 let rollStartTime = 0;
@@ -388,7 +396,7 @@ function hideAimVisual() {
 }
 
 function doThrow(getVelocity) {
-  if (!game.roll()) return;
+  if (!rogueRun.roll()) return;
   npcPool.placeBets();
   pot.setBet(game.bet + npcPool.totalBet);
   audio.playRoll();
@@ -429,7 +437,7 @@ function aimThrow() {
 
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
-  if (game.rolling || game.bankrupt || !game.canRoll) return;
+  if (!rogueRun.canRoll) return;
 
   dice.forEach((d, i) => {
     if (d.body.position.y < 0.5) hoverDie(d.body, i);
@@ -470,7 +478,7 @@ renderer.domElement.addEventListener('pointerleave', () => {
 });
 
 function forwardThrow() {
-  if (game.rolling || game.bankrupt || !game.canRoll) return;
+  if (!rogueRun.canRoll) return;
   doThrow((i) => [
     i === 0 ? -0.3 : 0.3,
     5,
@@ -544,18 +552,22 @@ function animate(time) {
           const [d1, d2] = values;
           const sum = d1 + d2;
           const currentPoint = game.point;
-          const result = game.resolve(values);
+          const result = rogueRun.resolve(values);
           const announcerText = callAnnouncement(d1, d2, sum, result, currentPoint);
 
           npcPool.settle(result, sum, currentPoint);
           if (result === 'win') {
             audio.playWin();
             pot.clear();
-            npcPool.reactAll(result === 'win' && sum === currentPoint ? 'made_point' : 'win');
+            npcPool.reactAll(sum === currentPoint ? 'made_point' : 'win');
           } else if (result === 'loss') {
             audio.playLose();
             pot.clear();
             npcPool.reactAll(sum === 7 ? 'seven_out' : 'loss');
+          } else if (result === 'push') {
+            audio.playSettle();
+            pot.clear();
+            if (Math.random() < 0.3) npcPool.reactAll('win');
           } else if (result === 'point') {
             audio.playSettle();
             npcPool.reactAll('point');
@@ -573,6 +585,17 @@ function animate(time) {
         });
         resultPending = false;
         ui.sync();
+        rogueUI.sync();
+
+        if (rogueRun.runState === 'PICKING') {
+          rogueUI.showPick();
+        } else if (rogueRun.runState === 'TABLE_CLEAR') {
+          rogueUI.showTableClear();
+        } else if (rogueRun.runState === 'BUST') {
+          rogueUI.showBust();
+        } else if (rogueRun.runState === 'RUN_WON') {
+          rogueUI.showRunWon();
+        }
       }
     } else {
       settleCount = 0;
@@ -587,9 +610,11 @@ function animate(time) {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === ' ') {
+    if (!rogueRun.canRoll) return;
     e.preventDefault();
     forwardThrow();
   }
+  if (rogueRun.runState !== 'BETTING') return;
   if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
     e.preventDefault();
     const idx = BET_CHIPS.indexOf(game.bet);

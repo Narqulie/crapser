@@ -132,7 +132,7 @@ export class UI {
     this.betChips.forEach(chip => {
       const val = parseInt(chip.dataset.amount);
       chip.classList.toggle('active', val === this.game.bet);
-      chip.disabled = this.game.rolling || this.game.phase === 'POINT';
+      chip.disabled = this.game.rolling || this.game.phase === 'POINT' || val < (this.game.minBet || 5);
     });
 
     this.rollCountEl.textContent = `rolls: ${this.game.rollCount}`;

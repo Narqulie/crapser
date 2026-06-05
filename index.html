@@ -17,6 +17,9 @@
       <div id="rules-hint">drag to aim  &middot;  [space] forward  &middot;  [&uarr;]&nbsp;[&darr;] bet  &middot;  dice must hit the back wall</div>
     </div>
 
+    <div id="table-display"></div>
+    <div id="run-status"></div>
+
     <div id="dice-result"></div>
 
     <div id="npcs"></div>
@@ -45,13 +48,47 @@
     <div id="power-bar-bg" style="display:none;pointer-events:none">
       <div id="power-bar-fill"></div>
     </div>
+
+    <div id="meta-top">
+      <span id="meta-display"></span>
+      <span id="reroll-display"></span>
+      <button id="perk-toggle">perks</button>
+    </div>
   </div>
 
+  <!-- Pick-3 Overlay -->
+  <div id="pick-overlay">
+    <div id="pick-header">choose an upgrade</div>
+    <div id="pick-cards"></div>
+    <div id="pick-actions">
+      <button id="pick-reroll" style="display:none">reroll</button>
+      <button id="pick-skip">skip</button>
+    </div>
+  </div>
+
+  <!-- Table Clear Overlay -->
+  <div id="table-clear">
+    <div id="table-clear-content">
+      <div id="table-clear-name"></div>
+      <button id="table-clear-btn">continue</button>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
   <div id="game-over">
     <div id="game-over-content">
       <h2>tapped out</h2>
       <p>better luck next time</p>
-      <button id="new-game-btn">new game</button>
+      <button id="new-game-btn">new run</button>
+    </div>
+  </div>
+
+  <!-- Perk Overlay -->
+  <div id="perk-overlay">
+    <div id="perk-content">
+      <div id="perk-title">perks</div>
+      <div id="perk-list"></div>
+      <button id="perk-close">close</button>
     </div>
   </div>
 
