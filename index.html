@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>street craps</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="ui">
+    <div id="game-info">
+      <div id="phase-display">COME OUT</div>
+      <div id="point-display"></div>
+      <div id="game-message">place your bet</div>
+      <div id="rules-hint">drag to aim  &middot;  [space] forward  &middot;  [&uarr;]&nbsp;[&darr;] bet  &middot;  dice must hit the back wall</div>
+    </div>
+
+    <div id="dice-result"></div>
+
+    <div id="npcs"></div>
+
+    <div id="bottom-area">
+      <div id="history-strip"></div>
+      <div id="bottom-bar">
+        <div id="money-display">$100</div>
+        <div id="bet-controls">
+          <span id="bet-label">bet</span>
+          <div id="bet-chips">
+            <button class="bet-chip" data-amount="5">5</button>
+            <button class="bet-chip" data-amount="10">10</button>
+            <button class="bet-chip" data-amount="25">25</button>
+            <button class="bet-chip" data-amount="50">50</button>
+            <button class="bet-chip" data-amount="100">100</button>
+          </div>
+        </div>
+        <div id="stats-display">
+          <span id="roll-count">rolls: 0</span>
+          <span id="win-count">wins: 0</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="power-bar-bg" style="display:none;pointer-events:none">
+      <div id="power-bar-fill"></div>
+    </div>
+  </div>
+
+  <div id="game-over">
+    <div id="game-over-content">
+      <h2>tapped out</h2>
+      <p>better luck next time</p>
+      <button id="new-game-btn">new game</button>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
