@@ -8,19 +8,23 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RGBShiftShader } from 'three/addons/shaders/RGBShiftShader.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import { createWorld, createDieBody, isSettled, hoverDie, launchDie } from './physics.js';
-import { createDie, getTopFace } from './dice.js';
+import { createDie, getTopFace, updateDieType } from './dice.js';
 import { RogueRun } from './rogue-run.js';
 import { RogueUI } from './rogue-ui.js';
 import { MetaProgress } from './meta-progress.js';
+import { ShopSystem } from './shop.js';
 import { UI } from './ui.js';
 import { AudioManager } from './audio.js';
 import { callAnnouncement, callDead } from './announcer.js';
-import { NPCPool } from './npcs.js';
+import { NPC_DEFS } from './npcs.js';
 import { Pot } from './pot.js';
+import { MAP_ACTS, getFloorNodes } from './map.js';
 
+// ==== CONSTANTS ====
 const SETTLE_FRAMES = 50;
 const SETTLE_TIMEOUT = 3000;
 
+// ==== SCENE SETUP ====
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0d0d1a);
 scene.fog = new THREE.Fog(0x0d0d1a, 60, 200);
@@ -37,6 +41,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 document.getElementById('app').appendChild(renderer.domElement);
 
+// ==== POST-PROCESSING ====
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 composer.addPass(new FilmPass(0.8, 0.5, 200, false));
@@ -52,6 +57,7 @@ composer.addPass(vignette);
 
 composer.addPass(new OutputPass());
 
+// ==== CONTROLS ====
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 0.5, -1);
 controls.enableDamping = true;
@@ -63,6 +69,7 @@ controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MO
 controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_PAN };
 controls.update();
 
+// ==== LIGHTING ====
 const ambient = new THREE.AmbientLight(0x222244, 0.5);
 scene.add(ambient);
 const hemi = new THREE.HemisphereLight(0x4466aa, 0x442222, 0.6);
@@ -92,6 +99,7 @@ const bulbGlow = new THREE.Mesh(
 bulbGlow.position.copy(streetLight.position);
 scene.add(bulbGlow);
 
+// ==== ENVIRONMENT ====
 function createCurbTexture() {
   const c = document.createElement('canvas');
   c.width = 128;
@@ -256,6 +264,7 @@ farTarget.position.set(0, 4, -20);
 scene.add(farTarget);
 aimTargets.push(farTarget);
 
+// ==== PHYSICS ====
 const { world, wallBody, groundBody, dieMat } = createWorld();
 
 const pot = new Pot(scene, world, groundBody, dieMat);
@@ -265,9 +274,21 @@ const HOVER_Y = 3;
 const HOVER_Z = 3.3;
 const BET_CHIPS = [5, 10, 25, 50, 100];
 
+const audio = new AudioManager();
+
+// ==== GAME STATE ====
+const meta = new MetaProgress();
+let shopSystem;
+shopSystem = new ShopSystem(meta);
+const rogueRun = new RogueRun(meta);
+rogueRun.resetRun(meta.getBonuses()); // apply meta bonuses for initial run
+const game = rogueRun.game;
+
+// Initialize dice with typeIds from starting hand
+const startingSlots = rogueRun.diceHandSlots;
 const dice = [
-  { mesh: createDie(), body: createDieBody(), hitWall: false },
-  { mesh: createDie(), body: createDieBody(), hitWall: false },
+  { mesh: createDie(startingSlots[0]?.typeId || 'standard'), body: createDieBody(), hitWall: false },
+  { mesh: createDie(startingSlots[1]?.typeId || 'standard'), body: createDieBody(), hitWall: false },
 ];
 
 dice.forEach((d, i) => {
@@ -276,7 +297,6 @@ dice.forEach((d, i) => {
   hoverDie(d.body, i);
 });
 
-const audio = new AudioManager();
 const lastBounce = [0, 0];
 dice.forEach((d, i) => {
   d.body.addEventListener('collide', (e) => {
@@ -289,31 +309,72 @@ dice.forEach((d, i) => {
   });
 });
 
-const meta = new MetaProgress();
-const rogueRun = new RogueRun(meta);
-rogueRun.resetRun(meta.getBonuses()); // apply meta bonuses for initial run
-const game = rogueRun.game;
-const npcPool = new NPCPool();
-const ui = new UI(game, npcPool);
-const rogueUI = new RogueUI(rogueRun);
-rogueUI.onNewRun = () => {
-  const bonuses = meta.getBonuses();
-  rogueRun.resetRun(bonuses);
-  npcPool.reset();
-  pot.clear();
-  dice.forEach((d, i) => {
-    d.hitWall = false;
-    hoverDie(d.body, i);
-  });
+const ui = new UI(game, rogueRun);
+const rogueUI = new RogueUI(rogueRun, ui, shopSystem, NPC_DEFS);
+
+// ==== CALLBACKS ====
+let _pendingVelocity = null; // stored velocity getter for dice pick flow
+
+rogueUI.onShopDone = () => {
+  // Shop sequence complete — sync everything
   ui.sync();
   rogueUI.sync();
 };
+rogueUI.onDicePickConfirmed = () => {
+  if (!_pendingVelocity) return;
+  const picked = rogueRun.pickedDice;
+
+  dice.forEach((d, i) => {
+    d.hitWall = false;
+    const die = picked[i];
+    if (die) {
+      updateDieType(d.mesh, die.id, die.durability);
+    }
+    const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
+    d.body.position.set(side, HOVER_Y, HOVER_Z);
+    const v = _pendingVelocity(i);
+    launchDie(d.body, v[0], v[1], v[2]);
+  });
+
+  settleCount = 0;
+  resultPending = false;
+  rollStartTime = Date.now();
+  _pendingVelocity = null;
+  ui.sync();
+};
+rogueUI.onNewRun = () => {
+  /**
+   * New-run callback: resets the roguelite run, clears the pot, syncs dice hand,
+   * then enters MAP_NAV state so the player can choose their first floor node.
+   * The game loop will detect MAP_NAV and call rogueUI.showMap().
+   */
+  const bonuses = meta.getBonuses();
+  rogueRun.resetRun(bonuses);
+  pot.clear();
+  const newSlots = rogueRun.diceHandSlots;
+  dice.forEach((d, i) => {
+    d.hitWall = false;
+    if (newSlots[i]) {
+      updateDieType(d.mesh, newSlots[i].typeId, newSlots[i].durability);
+    }
+    hoverDie(d.body, i);
+  });
+  ui.sync();
+  ui.updateTableProgress(game.money, rogueRun.getCurrentTarget(), rogueRun.isBossTable);
+  ui.updateBonusPanel(rogueRun.getActiveUpgradeList());
+  rogueUI.sync();
+  // Start map navigation — game loop will show map overlay
+  rogueRun.startMap();
+};
 rogueUI.sync();
+ui.updateTableProgress(game.money, rogueRun.getCurrentTarget(), rogueRun.isBossTable);
+ui.updateBonusPanel(rogueRun.getActiveUpgradeList());
 let settleCount = 0;
 let resultPending = false;
 let rollStartTime = 0;
 let hoverBob = 0;
 
+// ==== AIM ASSIST ====
 const raycaster = new THREE.Raycaster();
 let isAiming = false;
 let aimTarget = null;
@@ -395,10 +456,38 @@ function hideAimVisual() {
   ui.hidePower();
 }
 
+// ==== THROW LOGIC ====
+function aimThrow() {
+  if (!aimTarget) return;
+  if (!rogueRun.canRoll || rogueRun.runState !== 'BETTING') return;
+  const dx = aimTarget.x;
+  const dz = aimTarget.z - HOVER_Z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  if (dist < 0.3) return;
+
+  const dirX = dx / dist;
+  const dirZ = dz / dist;
+  const speed = THREE.MathUtils.clamp(dist * 1.2, 0.3, 16);
+  const vy = 1 + dist * 0.5;
+
+  if (!rogueRun.roll()) return;
+  pot.setBet(game.bet);
+  audio.playRoll();
+
+  _pendingVelocity = (i) => [
+    dirX * speed + (i === 0 ? -0.3 : 0.3),
+    vy,
+    dirZ * speed,
+  ];
+
+  hideAimVisual();
+  rogueUI.showDicePick();
+  ui.sync();
+}
+
 function doThrow(getVelocity) {
   if (!rogueRun.roll()) return;
-  npcPool.placeBets();
-  pot.setBet(game.bet + npcPool.totalBet);
+  pot.setBet(game.bet);
   audio.playRoll();
 
   dice.forEach((d, i) => {
@@ -416,28 +505,10 @@ function doThrow(getVelocity) {
   ui.sync();
 }
 
-function aimThrow() {
-  if (!aimTarget) return;
-  const dx = aimTarget.x;
-  const dz = aimTarget.z - HOVER_Z;
-  const dist = Math.sqrt(dx * dx + dz * dz);
-  if (dist < 0.3) return;
-
-  const dirX = dx / dist;
-  const dirZ = dz / dist;
-  const speed = THREE.MathUtils.clamp(dist * 1.2, 0.3, 16);
-  const vy = 1 + dist * 0.5;
-
-  doThrow((i) => [
-    dirX * speed + (i === 0 ? -0.3 : 0.3),
-    vy,
-    dirZ * speed,
-  ]);
-}
-
+// ==== INPUT HANDLERS ====
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
-  if (!rogueRun.canRoll) return;
+  if (!rogueRun.canRoll || rogueRun.runState !== 'BETTING') return;
 
   dice.forEach((d, i) => {
     if (d.body.position.y < 0.5) hoverDie(d.body, i);
@@ -478,15 +549,21 @@ renderer.domElement.addEventListener('pointerleave', () => {
 });
 
 function forwardThrow() {
-  if (!rogueRun.canRoll) return;
-  doThrow((i) => [
+  if (!rogueRun.canRoll || rogueRun.runState !== 'BETTING') return;
+  if (!rogueRun.roll()) return;
+  pot.setBet(game.bet);
+  audio.playRoll();
+  _pendingVelocity = (i) => [
     i === 0 ? -0.3 : 0.3,
     5,
     -8,
-  ]);
+  ];
+  rogueUI.showDicePick();
+  ui.sync();
 }
 
 let lastTime = 0;
+// ==== GAME LOOP ====
 function animate(time) {
   requestAnimationFrame(animate);
 
@@ -502,7 +579,37 @@ function animate(time) {
 
   pot.sync();
 
-  if (isAiming) {
+  // ========== MAP NAVIGATION ==========================
+  // When the run enters MAP_NAV state (after table clear or run start),
+  // show the map overlay so the player can choose their next floor node.
+  // Only renders once per state entry; _mapVisible flag prevents re-render.
+  if (rogueRun.runState === 'MAP_NAV') {
+    if (!rogueUI._mapVisible) {
+      const nodes = getFloorNodes(MAP_ACTS, rogueRun.currentActIndex, rogueRun.currentFloorIndex);
+      rogueUI.showMap(rogueRun.currentActIndex, rogueRun.currentFloorIndex, nodes, [...rogueRun.visitedNodes]);
+    }
+    // Keep dice hovering during map (same as idle hover)
+    hoverBob += 0.04;
+    dice.forEach((d, i) => {
+      if (d.body.position.y < 0.5) return;
+      const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
+      const bob = Math.sin(hoverBob + i * 1.5) * 0.06;
+      d.body.position.set(x, HOVER_Y + bob, HOVER_Z);
+      d.body.velocity.set(0, 0, 0);
+      d.body.angularVelocity.set(0, 0, 0);
+    });
+  } else if (rogueRun.runState === 'DICE_PICK') {
+    // Keep dice hovering during pick phase, prevent settle detection
+    hoverBob += 0.04;
+    dice.forEach((d, i) => {
+      if (d.body.position.y < 0.5) return;
+      const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
+      const bob = Math.sin(hoverBob + i * 1.5) * 0.06;
+      d.body.position.set(x, HOVER_Y + bob, HOVER_Z);
+      d.body.velocity.set(0, 0, 0);
+      d.body.angularVelocity.set(0, 0, 0);
+    });
+  } else if (isAiming) {
     dice.forEach((d, i) => {
       const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
       d.body.position.set(x, HOVER_Y, HOVER_Z);
@@ -521,7 +628,7 @@ function animate(time) {
     });
   }
 
-  if (game.rolling && !resultPending) {
+  if (game.rolling && !resultPending && rogueRun.runState !== 'DICE_PICK') {
     const elapsed = Date.now() - rollStartTime;
     const almostStill = elapsed > SETTLE_TIMEOUT && dice.every(d =>
       d.body.velocity.length() < 0.3 && d.body.angularVelocity.length() < 0.3
@@ -548,36 +655,62 @@ function animate(time) {
           pot.clear();
           audio.playBounce();
           ui.showAnnouncement(callDead(), 'dead');
+          ui.sync();
+          rogueUI.sync();
         } else {
           const values = dice.map(d => getTopFace(d.mesh));
           const [d1, d2] = values;
           const sum = d1 + d2;
           const currentPoint = game.point;
+          const moneyBefore = game.money;
+
           const result = rogueRun.resolve(values);
           const announcerText = callAnnouncement(d1, d2, sum, result, currentPoint);
+          const netChange = game.money - moneyBefore;
 
-          npcPool.settle(result, sum, currentPoint);
           if (result === 'win') {
             audio.playWin();
             pot.clear();
-            npcPool.reactAll(sum === currentPoint ? 'made_point' : 'win');
           } else if (result === 'loss') {
             audio.playLose();
             pot.clear();
-            npcPool.reactAll(sum === 7 ? 'seven_out' : 'loss');
           } else if (result === 'push') {
             audio.playSettle();
             pot.clear();
-            if (Math.random() < 0.3) npcPool.reactAll('win');
           } else if (result === 'point') {
             audio.playSettle();
-            npcPool.reactAll('point');
           } else {
             audio.playSettle();
-            if (Math.random() < 0.3) npcPool.reactAll('win');
           }
 
+          UI.flashScreen(result);
           ui.showAnnouncement(announcerText, result);
+
+          const resolveData = { result, netChange };
+
+          setTimeout(() => {
+            const basePayout = result === 'win' ? game.bet * 2
+              : result === 'push' ? game.bet
+              : 0;
+            ui.showResultCard(resolveData.result, game.bet, basePayout, [], resolveData.netChange);
+
+            setTimeout(() => {
+              ui.sync();
+              ui.updateTableProgress(game.money, rogueRun.getCurrentTarget(), rogueRun.isBossTable);
+              ui.updateBonusPanel(rogueRun.getActiveUpgradeList());
+              rogueUI.sync();
+
+              if (rogueRun.runState === 'PICKING') {
+                rogueUI.showPick();
+              } else if (rogueRun.runState === 'BUST') {
+                rogueUI.showBust();
+              } else if (rogueRun.runState === 'RUN_WON') {
+                rogueUI.showRunWon();
+              } else if (rogueRun.runState === 'DICE_PICK') {
+                rogueUI.showDicePick();
+              }
+            }, 2800);
+          }, 400);
         }
 
         dice.forEach((d, i) => {
@@ -585,18 +718,6 @@ function animate(time) {
           hoverDie(d.body, i);
         });
         resultPending = false;
-        ui.sync();
-        rogueUI.sync();
-
-        if (rogueRun.runState === 'PICKING') {
-          rogueUI.showPick();
-        } else if (rogueRun.runState === 'TABLE_CLEAR') {
-          rogueUI.showTableClear();
-        } else if (rogueRun.runState === 'BUST') {
-          rogueUI.showBust();
-        } else if (rogueRun.runState === 'RUN_WON') {
-          rogueUI.showRunWon();
-        }
       }
     } else {
       settleCount = 0;
@@ -609,9 +730,10 @@ function animate(time) {
   composer.render();
 }
 
+// ==== KEYBOARD SHORTCUTS ====
 document.addEventListener('keydown', (e) => {
   if (e.key === ' ') {
-    if (!rogueRun.canRoll) return;
+    if (!rogueRun.canRoll || rogueRun.runState !== 'BETTING') return;
     e.preventDefault();
     forwardThrow();
   }
@@ -634,6 +756,7 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ==== BOOTSTRAP ====
 animate();
 
 window.addEventListener('resize', () => {

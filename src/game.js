@@ -5,10 +5,29 @@ const CRAPS_NAMES = {
 };
 
 export class Game {
+  /**
+   * Pass-line street craps state machine.
+   *
+   * @property {number} money - Current bankroll
+   * @property {number} bet - Current bet amount (clamped to minBet–100)
+   * @property {number} minBet - Minimum allowed bet (enforced by table/rogue run)
+   * @property {number|null} point - The established point number, or null during come-out
+   * @property {'COME_OUT'|'POINT'} phase - Current game phase
+   * @property {boolean} rolling - Whether dice are currently in motion
+   * @property {number} rollCount - Total rolls this session
+   * @property {number} winCount - Total resolved wins
+   * @property {number} lossCount - Total resolved losses
+   * @property {number[]|null} lastRoll - The two individual die values from the last roll
+   * @property {number|null} lastSum - The total sum of the last roll
+   * @property {Array<{values:number[], sum:number, result:string}>} rollHistory - Recent rolls (max 12)
+   * @property {Array<{values:number[], sum:number, result:string}>} handHistory - Current hand rolls (max 50)
+   * @property {string} message - Human-readable status message for the UI
+   */
   constructor() {
     this.reset();
   }
 
+  /** Reset all game state to initial values (fresh session) */
   reset() {
     this.money = 100;
     this.bet = 10;
@@ -27,14 +46,16 @@ export class Game {
     this.message = 'place your bet';
   }
 
+  /** @returns {boolean} True when dice are not rolling — a new roll can begin */
   get canRoll() {
     return !this.rolling;
   }
 
-  get bankrupt() {
-    return this.money < 0 && this.phase === 'COME_OUT';
-  }
-
+  /**
+   * Mark the beginning of a dice roll: deduct bet on come-out,
+   * set rolling flag, increment roll count.
+   * @returns {boolean} True if roll was accepted (canRoll was true)
+   */
   roll() {
     if (!this.canRoll) return false;
 
@@ -53,6 +74,15 @@ export class Game {
     return true;
   }
 
+  /**
+   * Resolve the dice roll with standard pass-line craps rules.
+   *
+   * Come-out phase: 7/11 = win, 2/3/12 = loss, anything else = point established.
+   * Point phase: hitting the point = win, 7 = loss (seven out), anything else = continue.
+   *
+   * @param {[number, number]} values - The two die face values
+   * @returns {'win'|'loss'|'point'|'continue'} Result of the roll resolution
+   */
   resolve(values) {
     this.rolling = false;
     this.lastRoll = values;
@@ -110,6 +140,10 @@ export class Game {
     return result;
   }
 
+  /**
+   * Handle a dead throw (dice failed to land properly):
+   * refund bet if on come-out, reset rolling state, decrement roll count.
+   */
   deadThrow() {
     if (this.phase === 'COME_OUT') {
       this.money += this.bet;
@@ -119,6 +153,10 @@ export class Game {
     this.message = 'dead throw \u2014 roll again';
   }
 
+  /**
+   * Set the current bet amount, clamped between minBet (or 5) and 100.
+   * @param {number} amount - Desired bet amount
+   */
   setBet(amount) {
     this.bet = Math.min(Math.max(this.minBet || 5, amount), 100);
   }

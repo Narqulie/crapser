@@ -1,34 +1,106 @@
+// ============================================================
+// pot.js — Cosmetic Money Pile (Physics-Simulated)
+// ============================================================
+//
+// THIS MODULE IS PURELY COSMETIC. It renders a physics-simulated
+// pile of bills and coins that sits on the table — it does NOT
+// affect game logic, payouts, or the player's money balance.
+//
+// When the player places a bet, `setBet(amount)` breaks the amount
+// into the fewest possible bills (using greedy denomination
+// decomposition) plus $1 coins for remainders, then spawns each
+// item above the pile position with random scatter. Cannon-es
+// bodies let them tumble and stack naturally.
+//
+// Denomination breakdown:
+//   $100 — dark goldenrod bill
+//   $50  — purple bill
+//   $20  — orange bill
+//   $10  — blue bill
+//   $5   — green bill
+//   $1   — gold coin (remainders; Cylinder mesh)
+//
+// A floating label sprite above the pile shows the total bet.
+// Bill textures are rendered once per denomination on off-screen
+// canvases and cached for reuse.
+
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 
+// ========== CONSTANTS ==========
+
+/**
+ * Bill denominations in descending order (greedy decomposition).
+ * @constant {number[]}
+ */
 const BILL_DENOMS = [100, 50, 20, 10, 5];
+
+/**
+ * CSS colour per denomination used for bill texture backgrounds.
+ * @constant {Object<number, string>}
+ */
 const BILL_COLORS = {
   100: '#b8860b',
-  50: '#7a4a8a',
-  20: '#c97d3a',
-  10: '#4a7cb5',
-  5: '#4a7c59',
+  50:  '#7a4a8a',
+  20:  '#c97d3a',
+  10:  '#4a7cb5',
+  5:   '#4a7c59',
 };
+
+// ========== DIMENSIONS ==========
+
+/** Bill mesh dimensions (width × thickness × height). */
 const BILL_W = 2.8;
 const BILL_H = 1.2;
 const BILL_T = 0.08;
-const SPAWN_Y = 3.5;
-const PILE_X = -9;
-const PILE_Z = 0;
-const SCATTER = 5.0;
+
+/** Coin mesh dimensions (radius, height). */
 const COIN_R = 0.5;
 const COIN_H = 0.1;
 
-let _billGeo, _coinGeo;
+// ========== PLACEMENT ==========
+
+/** Y-coordinate where items are spawned (above the pile). */
+const SPAWN_Y = 3.5;
+
+/** Center X of the pile on the table. */
+const PILE_X = -9;
+
+/** Center Z of the pile on the table. */
+const PILE_Z = 0;
+
+/** Max random scatter radius (bills). Coins use 60 % of this. */
+const SCATTER = 5.0;
+
+// ========== SHARED GEOMETRY (cached) ==========
+
+let _billGeo;
+let _coinGeo;
+
+/** @returns {THREE.BoxGeometry} */
 function getBillGeo() {
   if (!_billGeo) _billGeo = new THREE.BoxGeometry(BILL_W, BILL_T, BILL_H);
   return _billGeo;
 }
+
+/** @returns {THREE.CylinderGeometry} */
 function getCoinGeo() {
   if (!_coinGeo) _coinGeo = new THREE.CylinderGeometry(COIN_R, COIN_R, COIN_H, 12);
   return _coinGeo;
 }
 
+// ========== TEXTURE GENERATION ==========
+
+/**
+ * Render a bill texture on an off-screen canvas.
+ *
+ * Each denomination gets its own colour and a large "$XX" label.
+ * Textures are cached on the Pot instance so they're only drawn
+ * once per denomination.
+ *
+ * @param {number} denom — bill denomination (5, 10, 20, 50, or 100).
+ * @returns {THREE.CanvasTexture}
+ */
 function makeBillTexture(denom) {
   const c = document.createElement('canvas');
   c.width = 200;
@@ -55,14 +127,30 @@ function makeBillTexture(denom) {
   return new THREE.CanvasTexture(c);
 }
 
+// ========== MATERIAL ==========
+
+/** Shared cannon-es material for all pot bodies (bills + coins). */
 const potMat = new CANNON.Material('pot');
 
+// ============================================================
+// Pot — physics-driven cosmetic bet pile
+// ============================================================
 export class Pot {
+  /**
+   * Create the money pile.
+   *
+   * @param {THREE.Scene}     scene      — Three.js scene to add meshes to.
+   * @param {CANNON.World}    world      — cannon-es world for physics bodies.
+   * @param {CANNON.Body}     groundBody — the ground plane body (for contact mats).
+   * @param {CANNON.Material} dieMat     — die material (for die↔pot contacts).
+   */
   constructor(scene, world, groundBody, dieMat) {
+    /** @type {THREE.Group} */
     this.group = new THREE.Group();
     scene.add(this.group);
     this.world = world;
 
+    // Contact materials: pot↔pot, pot↔ground, die↔pot
     world.addContactMaterial(new CANNON.ContactMaterial(potMat, potMat, {
       friction: 0.3, restitution: 0.05,
     }));
@@ -74,18 +162,37 @@ export class Pot {
       friction: 0.5, restitution: 0.05,
     }));
 
+    /** @type {{mesh: THREE.Mesh, body: CANNON.Body}[]} */
     this.bills = [];
+    /** @type {{mesh: THREE.Mesh, body: CANNON.Body}[]} */
     this.coins = [];
+    /** @type {number} */
     this.amount = 0;
+
+    /** @type {THREE.Sprite|null} */
     this.labelSprite = null;
+
+    /** @private @type {Object<number, THREE.CanvasTexture>} */
     this._billTexCache = {};
 
+    // Shared materials (cloned per bill so each can have its own texture)
     this.billMat = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.0 });
     this.coinMat = new THREE.MeshStandardMaterial({
       color: 0xffd700, metalness: 0.7, roughness: 0.3,
     });
   }
 
+  // ========== PUBLIC API ==========
+
+  /**
+   * Rebuild the pile to represent a new bet amount.
+   *
+   * Clears all existing bills and coins, decomposes `amount` into
+   * physical items using greedy denomination selection, spawns them,
+   * and updates the floating dollar-amount label.
+   *
+   * @param {number} amount — total bet value in dollars.
+   */
   setBet(amount) {
     this.clear();
     this.amount = amount;
@@ -99,11 +206,15 @@ export class Pot {
       }
     }
 
+    // Remainders become $1 coins
     for (let i = 0; i < remaining; i++) this._spawnCoin();
 
     this._updateLabel();
   }
 
+  /**
+   * Remove all meshes and physics bodies, resetting the pile to empty.
+   */
   clear() {
     for (const b of this.bills) {
       this.group.remove(b.mesh);
@@ -119,6 +230,31 @@ export class Pot {
     if (this.labelSprite) this.labelSprite.visible = false;
   }
 
+  /**
+   * Sync mesh transforms to their physics bodies.
+   *
+   * Called every frame from the game loop so the visible pile
+   * matches the cannon-es simulation.
+   */
+  sync() {
+    for (const item of [...this.bills, ...this.coins]) {
+      item.mesh.position.copy(item.body.position);
+      item.mesh.quaternion.copy(item.body.quaternion);
+    }
+  }
+
+  // ========== PRIVATE SPAWNING ==========
+
+  /**
+   * Spawn a single bill of the given denomination.
+   *
+   * Creates a textured Box mesh + matching cannon-es Box body at a
+   * random position within SCATTER radius of PILE_X/PILE_Z, above
+   * SPAWN_Y. Bill textures are created once and cached.
+   *
+   * @private
+   * @param {number} denom — denomination (5, 10, 20, 50, 100).
+   */
   _spawnBill(denom) {
     if (!this._billTexCache[denom]) this._billTexCache[denom] = makeBillTexture(denom);
     const tex = this._billTexCache[denom];
@@ -155,6 +291,14 @@ export class Pot {
     this.bills.push({ mesh, body });
   }
 
+  /**
+   * Spawn a single $1 coin.
+   *
+   * Creates a gold Cylinder mesh + matching cannon-es Cylinder body
+   * at a random position (tighter scatter than bills).
+   *
+   * @private
+   */
   _spawnCoin() {
     const mesh = new THREE.Mesh(getCoinGeo(), this.coinMat);
     const angle = Math.random() * Math.PI * 2;
@@ -185,6 +329,14 @@ export class Pot {
     this.coins.push({ mesh, body });
   }
 
+  // ========== LABEL ==========
+
+  /**
+   * Update the floating "$N" sprite above the pile to match `this.amount`.
+   * Creates the label on first call.
+   *
+   * @private
+   */
   _updateLabel() {
     if (!this.labelSprite) this._createLabel();
     const ctx = this._labelCtx;
@@ -206,6 +358,11 @@ export class Pot {
     this.labelSprite.visible = true;
   }
 
+  /**
+   * Create the label sprite (off-screen canvas → texture → Sprite).
+   *
+   * @private
+   */
   _createLabel() {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
@@ -226,12 +383,5 @@ export class Pot {
     this.group.add(sprite);
     this.labelSprite = sprite;
     this._updateLabel();
-  }
-
-  sync() {
-    for (const item of [...this.bills, ...this.coins]) {
-      item.mesh.position.copy(item.body.position);
-      item.mesh.quaternion.copy(item.body.quaternion);
-    }
   }
 }

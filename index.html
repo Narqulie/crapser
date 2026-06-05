@@ -31,9 +31,29 @@
           <button id="perk-toggle">perks</button>
         </div>
       </div>
+      <div id="table-progress">
+        <div class="table-progress-fill"></div>
+        <span class="table-progress-label"></span>
+      </div>
+      <div id="bonus-panel"></div>
       <div id="history-strip"></div>
       <div id="bottom-bar">
-        <div id="money-display">$100</div>
+        <div id="money-bar">
+          <div class="money-bar-section">
+            <span class="money-bar-label">MONEY</span>
+            <span class="money-bar-value" id="money-value">$100</span>
+          </div>
+          <span class="money-bar-divider">|</span>
+          <div class="money-bar-section">
+            <span class="money-bar-label">BET</span>
+            <span class="money-bar-value" id="bet-value">$10</span>
+          </div>
+          <span class="money-bar-divider">|</span>
+          <div class="money-bar-section win">
+            <span class="money-bar-label">TO WIN</span>
+            <span class="money-bar-value" id="payout-value">$20</span>
+          </div>
+        </div>
         <div id="bet-controls">
           <span id="bet-label">bet</span>
           <div id="bet-chips">
@@ -56,6 +76,16 @@
     </div>
   </div>
 
+  <!-- Map Navigation Overlay -->
+  <div id="map-overlay">
+    <div class="map-panel">
+      <div id="map-header">Choose Your Path</div>
+      <div id="map-act-label"></div>
+      <div id="map-floor-label"></div>
+      <div id="map-nodes"></div>
+    </div>
+  </div>
+
   <!-- Pick-3 Overlay -->
   <div id="pick-overlay">
     <div id="pick-header">choose an upgrade</div>
@@ -63,6 +93,15 @@
     <div id="pick-actions">
       <button id="pick-reroll" style="display:none">reroll</button>
       <button id="pick-skip">skip</button>
+    </div>
+  </div>
+
+  <!-- Dice Pick Overlay -->
+  <div id="dice-pick-overlay">
+    <div id="dice-pick-header">pick 2 dice</div>
+    <div id="dice-pick-slots"></div>
+    <div id="dice-pick-actions">
+      <button id="dice-pick-confirm" disabled>roll</button>
     </div>
   </div>
 
@@ -80,6 +119,43 @@
       <h2>tapped out</h2>
       <p>better luck next time</p>
       <button id="new-game-btn">new run</button>
+    </div>
+  </div>
+
+  <!-- Result Card Overlay -->
+  <div id="result-card">
+    <div class="result-card">
+      <div class="result-header"></div>
+      <div class="result-breakdown"></div>
+      <div class="result-net"></div>
+    </div>
+  </div>
+
+  <!-- SHOP OVERLAY -->
+  <div id="shop-overlay">
+    <div class="shop-panel">
+      <div class="shop-portrait">
+        <div class="shop-avatar" id="shop-avatar"></div>
+        <div class="shop-info">
+          <div class="shop-npc-name" id="shop-npc-name"></div>
+          <div class="shop-npc-greeting" id="shop-npc-greeting"></div>
+        </div>
+        <div class="shop-trust-badge" id="shop-trust-badge"></div>
+      </div>
+      <div class="shop-money" id="shop-money">Money: $0</div>
+      <div class="shop-items" id="shop-items"></div>
+      <button class="shop-leave-btn" id="shop-leave">Leave Shop</button>
+    </div>
+  </div>
+
+  <!-- Vow Selection Overlay -->
+  <div id="vow-select-overlay">
+    <div id="vow-select-panel">
+      <div id="vow-select-header">Choose Your Burden</div>
+      <div id="vow-select-cards"></div>
+      <div id="vow-select-actions">
+        <button id="vow-skip-btn">No Vow</button>
+      </div>
     </div>
   </div>
 

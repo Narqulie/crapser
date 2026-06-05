@@ -1,4 +1,6 @@
-import { getUpgrade, getTotalTables } from './upgrades.js';
+import { getUpgrade } from './upgrades.js';
+import { PERKS, VOW_DEFS } from './meta-progress.js';
+import { MAP_ACTS } from './map.js';
 
 const RARITY_COLORS = {
   common: '#888',
@@ -14,8 +16,17 @@ const CATEGORY_ICONS = {
 };
 
 export class RogueUI {
-  constructor(rogueRun) {
+  /**
+   * @param {import('./rogue-run.js').RogueRun} rogueRun - The roguelite run state machine
+   * @param {import('./ui.js').UI} ui - Main HUD controller
+   * @param {import('./shop.js').ShopSystem|null} shopSystem - NPC shop system (optional)
+   * @param {Array<{id:string, name:string, color:string, initials:string}>} npcs - NPC definitions for shop portraits
+   */
+  constructor(rogueRun, ui, shopSystem = null, npcs = []) {
     this.rogueRun = rogueRun;
+    this.ui = ui;
+    this.shopSystem = shopSystem;
+    this.npcs = npcs; // array of NPC objects with .id, .name, .color, .initials
     this._showing = false;
 
     // Pick overlay
@@ -46,14 +57,20 @@ export class RogueUI {
     this.rerollEl = document.getElementById('reroll-display');
 
     // Table clear overlay
-    this.tableClearEl = document.getElementById('table-clear');
-    this.tableClearName = document.getElementById('table-clear-name');
-    this.tableClearBtn = document.getElementById('table-clear-btn');
-    if (this.tableClearBtn) {
-      this.tableClearBtn.addEventListener('click', () => {
-        this.hideTableClear();
-        this.rogueRun.runState = 'BETTING';
-        this.sync();
+    // Table clear overlay removed — map navigation replaces it.
+    if (document.getElementById('table-clear-btn')) {
+      document.getElementById('table-clear-btn').addEventListener('click', () => {
+        // Start shop sequence
+        const next = this.rogueRun.advanceShop ? this.rogueRun.advanceShop() : null;
+        if (next) {
+          this.showShop(next);
+        } else {
+          // No shops — go to betting
+          this.rogueRun.runState = 'BETTING';
+          this.ui.sync();
+          this.sync();
+          if (this.onShopDone) this.onShopDone();
+        }
       });
     }
 
@@ -74,10 +91,78 @@ export class RogueUI {
         }
       });
     }
+
+    // Shop overlay
+    this.shopOverlay = document.getElementById('shop-overlay');
+    this.shopAvatar = document.getElementById('shop-avatar');
+    this.shopNpcName = document.getElementById('shop-npc-name');
+    this.shopNpcGreeting = document.getElementById('shop-npc-greeting');
+    this.shopTrustBadge = document.getElementById('shop-trust-badge');
+    this.shopMoney = document.getElementById('shop-money');
+    this.shopItems = document.getElementById('shop-items');
+    this.shopLeaveBtn = document.getElementById('shop-leave');
+
+    // Vow selection overlay
+    this.vowSelectOverlay = document.getElementById('vow-select-overlay');
+    this.vowSelectCards = document.getElementById('vow-select-cards');
+    this.vowSkipBtn = document.getElementById('vow-skip-btn');
+
+    // Dice pick overlay
+    this.dicePickOverlay = document.getElementById('dice-pick-overlay');
+    this.dicePickSlots = document.getElementById('dice-pick-slots');
+    this.dicePickConfirm = document.getElementById('dice-pick-confirm');
+    this._pickedSlots = [];
+
+    // Map navigation overlay
+    this.mapOverlay = document.getElementById('map-overlay');
+    this.mapHeaderEl = document.getElementById('map-header');
+    this.mapActLabel = document.getElementById('map-act-label');
+    this.mapFloorLabel = document.getElementById('map-floor-label');
+    this.mapNodes = document.getElementById('map-nodes');
+    this._mapVisible = false;
+
+    if (this.shopLeaveBtn) {
+      this.shopLeaveBtn.addEventListener('click', () => {
+        this.hideShop();
+        const next = this.rogueRun.advanceShop ? this.rogueRun.advanceShop() : null;
+        if (next) {
+          this.showShop(next);
+        } else {
+          // Back to betting — sync full UI
+          this.ui.sync();
+          this.sync();
+          if (this.onShopDone) this.onShopDone();
+        }
+      });
+    }
+
+    if (this.dicePickConfirm) {
+      this.dicePickConfirm.addEventListener('click', () => {
+        if (this._pickedSlots.length !== 2) return;
+        const slotA = this._pickedSlots[0];
+        const slotB = this._pickedSlots[1];
+        const success = this.rogueRun.confirmDicePick([slotA, slotB]);
+        if (success) {
+          this.hideDicePick();
+          if (this.onDicePickConfirmed) this.onDicePickConfirmed();
+        }
+      });
+    }
+
+    if (this.vowSkipBtn) {
+      this.vowSkipBtn.addEventListener('click', () => {
+        this.hideVowSelect();
+        this._continueNewRun();
+      });
+    }
   }
 
   // ─── PICK OVERLAY ────────────────────────────────────
 
+  /**
+   * Display the pick-1-of-3 upgrade overlay with staggered entrance animation.
+   * Gets options from rogueRun, renders cards with rarity colors and category icons.
+   */
   showPick() {
     if (this._showing) return;
     this._showing = true;
@@ -121,42 +206,113 @@ export class RogueUI {
     });
   }
 
+  /**
+   * Hide all overlays (pick, shop, dice pick, vow, map) and re-sync UI.
+   */
   hide() {
     this._showing = false;
-    this.overlay.classList.remove('visible');
+    this.overlay?.classList.remove('visible');
+    this.hideShop();
+    this.hideDicePick();
+    this.hideVowSelect();
+    this.hideMap();
     this.sync();
   }
 
-  // ─── TABLE CLEAR OVERLAY ─────────────────────────────
+  // ─── MAP OVERLAY ──────────────────────────────────
 
-  showTableClear() {
-    const table = this.rogueRun.getCurrentTable();
-    const prevTable = getTotalTables() - (getTotalTables() - this.rogueRun.tableIndex);
-    const isBoss = table.boss;
-    const bossLabel = isBoss ? 'BOSS TABLE' : 'table cleared';
+  /**
+   * Render the map navigation overlay showing all nodes on the current floor.
+   * Each node card displays its type icon, name, NPC opponent/shopkeeper,
+   * target money (for table/boss nodes), and trait badge if applicable.
+   * Clicking a non-visited node selects it and hides the map.
+   *
+   * @param {number} actIndex - Current act index (0-based)
+   * @param {number} floorIndex - Current floor index (0-based)
+   * @param {Array<object>} nodes - Floor nodes from MAP_ACTS
+   * @param {string[]} visitedNodeIds - Array of already visited node IDs
+   */
+  showMap(actIndex, floorIndex, nodes, visitedNodeIds) {
+    if (!this.mapOverlay || !this.mapNodes) return;
+    if (this._mapVisible) return;
 
-    if (this.tableClearName) {
-      this.tableClearName.innerHTML = `
-        <div class="table-clear-number">${isBoss ? '⚔' : '★'} ${bossLabel}</div>
-        <div class="table-clear-name">${table.name}</div>
-        <div class="table-clear-money">money: $${this.rogueRun.game.money}</div>
-        <div class="table-clear-next">next: ${getTotalTables() > this.rogueRun.tableIndex + 1
-          ? `Table ${this.rogueRun.tableIndex + 1}/${getTotalTables()}`
-          : 'final table!'}</div>
-      `;
-    }
+    const act = MAP_ACTS[actIndex];
+    const floor = act?.floors?.[floorIndex];
+    if (!act || !floor) return;
 
+    const TYPE_ICONS = {
+      table: '\u25C6',   // ◆
+      boss: '\u2605',    // ★
+      shop: '$',         // $
+      mystery: '?',      // ?
+      rest: '\u2665',    // ♥
+    };
+
+    const visitedSet = new Set(visitedNodeIds || []);
+
+    // Set header labels
+    if (this.mapHeaderEl) this.mapHeaderEl.textContent = 'Choose Your Path';
+    if (this.mapActLabel) this.mapActLabel.textContent = act.name;
+    if (this.mapFloorLabel) this.mapFloorLabel.textContent = floor.name;
+
+    // Build node cards
+    this.mapNodes.innerHTML = nodes.map(node => {
+      const icon = TYPE_ICONS[node.type] || '?';
+      const visited = visitedSet.has(node.id);
+      const traitHTML = node.trait
+        ? `<span class="map-node-trait">${node.trait}</span>`
+        : '';
+      const targetHTML = (node.type === 'table' || node.type === 'boss') && node.target
+        ? `<span class="map-node-target">Target: $${node.target}</span>`
+        : '';
+      const npcHTML = node.npc
+        ? `<span class="map-node-npc">${node.type === 'shop' ? node.npc : 'vs ' + node.npc}</span>`
+        : '';
+
+      return `<div class="map-node type-${node.type} ${visited ? 'visited' : ''}" data-node-id="${node.id}">
+        <div class="map-node-header">
+          <span class="map-node-icon">${icon}</span>
+          <span class="map-node-name">${node.name}</span>
+        </div>
+        ${npcHTML}
+        ${targetHTML || traitHTML ? `<div class="map-node-meta">${targetHTML}${traitHTML}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    // Attach click handlers for non-visited nodes
+    this.mapNodes.querySelectorAll('.map-node:not(.visited)').forEach(card => {
+      card.addEventListener('click', () => {
+        const nodeId = card.dataset.nodeId;
+        if (!nodeId) return;
+        this.rogueRun.selectNode(nodeId);
+        this.hideMap();
+      });
+    });
+
+    this._mapVisible = true;
     requestAnimationFrame(() => {
-      if (this.tableClearEl) this.tableClearEl.classList.add('visible');
+      this.mapOverlay.classList.add('visible');
     });
   }
 
-  hideTableClear() {
-    if (this.tableClearEl) this.tableClearEl.classList.remove('visible');
+  /**
+   * Dismiss the map navigation overlay.
+   * Resets the _mapVisible flag so the game loop can re-trigger showMap
+   * when the run state returns to MAP_NAV.
+   */
+  hideMap() {
+    if (this.mapOverlay) {
+      this.mapOverlay.classList.remove('visible');
+    }
+    this._mapVisible = false;
   }
 
   // ─── PERK OVERLAY ────────────────────────────────────
 
+  /**
+   * Show the meta-progression perk overlay with clickable unlockable perks.
+   * Builds perk items from the PERKS definition imported from meta-progress.
+   */
   showPerks() {
     if (!this.perkOverlay || !this.rogueRun.meta) return;
     const meta = this.rogueRun.meta;
@@ -168,7 +324,7 @@ export class RogueUI {
         <span>${data.xp} XP</span>
         <span>${data.availablePoints} point${data.availablePoints !== 1 ? 's' : ''}</span>
       </div>
-      ${PERK_ITEMS.map(p => {
+      ${PERKS.map(p => {
         const unlocked = data.unlockedPerks.includes(p.id);
         const canBuy = data.availablePoints >= p.cost && !unlocked &&
           (!p.prerequisite || data.unlockedPerks.includes(p.prerequisite));
@@ -195,63 +351,406 @@ export class RogueUI {
     this.perkOverlay.classList.add('visible');
   }
 
+  /** Dismiss the perk overlay */
   hidePerks() {
     if (this.perkOverlay) this.perkOverlay.classList.remove('visible');
   }
 
+  // ─── SHOP OVERLAY ───────────────────────────────────
+
+  /**
+   * Show the NPC shop overlay with inventory, portrait, trust badge, and buy buttons.
+   * @param {string} npcId - NPC identifier from shopSystem
+   */
+  showShop(npcId) {
+    if (!this.shopOverlay || !this.shopSystem) return;
+
+    const npc = this.npcs.find(n => n.id === npcId);
+    if (!npc) return;
+
+    const trustLevel = this.shopSystem.getTrustLevel(npcId);
+    const greeting = this.shopSystem.getGreeting(npcId);
+    const tableTarget = this.rogueRun.getCurrentTarget();
+    const inventory = this.shopSystem.getInventory(npcId, tableTarget);
+
+    // Portrait
+    if (this.shopAvatar) {
+      this.shopAvatar.style.background = npc.color;
+      this.shopAvatar.textContent = npc.initials;
+    }
+    if (this.shopNpcName) this.shopNpcName.textContent = npc.name;
+    if (this.shopNpcGreeting) this.shopNpcGreeting.textContent = greeting;
+    if (this.shopTrustBadge) {
+      this.shopTrustBadge.textContent = `Trust Lv ${trustLevel}`;
+      this.shopTrustBadge.style.display = '';
+    }
+
+    // Money
+    if (this.shopMoney) {
+      this.shopMoney.textContent = `Money: $${this.rogueRun.game.money}`;
+    }
+
+    // Items
+    if (this.shopItems) {
+      this.shopItems.innerHTML = inventory.map(item => {
+        const cost = this.shopSystem.getItemCost(item, tableTarget);
+        const canBuy = this.shopSystem.canAfford(this.rogueRun.game.money, item, tableTarget);
+        const buyClass = item.stubbed ? 'stubbed'
+          : canBuy ? '' : 'cant-afford';
+
+        return `<div class="shop-item" data-id="${item.id}" data-rarity="${item.rarity}">
+          <div class="shop-item-info">
+            <div class="shop-item-name">${item.name}</div>
+            <div class="shop-item-desc">${item.desc}</div>
+            ${item.stubbed ? `<div class="shop-item-stubbed">${item.descStubbed}</div>` : ''}
+          </div>
+          <div class="shop-item-cost">
+            <div class="shop-cost-amount">$${cost}</div>
+            <div class="shop-cost-label">${item.rarity}</div>
+          </div>
+          <button class="shop-buy-btn ${buyClass}" ${!canBuy || item.stubbed ? 'disabled' : ''}>
+            ${item.stubbed ? 'LOCKED' : canBuy ? 'Buy' : 'Expensive'}
+          </button>
+        </div>`;
+      }).join('');
+
+      // Attach buy handlers
+      this.shopItems.querySelectorAll('.shop-buy-btn:not(.cant-afford):not(.stubbed)').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const card = btn.closest('.shop-item');
+          const itemId = card.dataset.id;
+          this._handleBuy(itemId, npcId, btn);
+        });
+      });
+    }
+
+    // Show overlay
+    requestAnimationFrame(() => {
+      this.shopOverlay.classList.add('visible');
+    });
+  }
+
+  /** Dismiss the shop overlay */
+  hideShop() {
+    if (this.shopOverlay) {
+      this.shopOverlay.classList.remove('visible');
+    }
+  }
+
+  /**
+   * Handle buy button click: process purchase, update button states,
+   * refresh money display and re-check affordability.
+   * @param {string} itemId - Shop item identifier
+   * @param {string} npcId - NPC shopkeeper identifier
+   * @param {HTMLElement} btn - The clicked button element
+   */
+  _handleBuy(itemId, npcId, btn) {
+    const result = this.shopSystem.buy(this.rogueRun, npcId, itemId);
+
+    if (!result.success) {
+      // Flash reason briefly
+      btn.textContent = result.reason || 'Failed';
+      btn.classList.add('bought');
+      setTimeout(() => {
+        this.showShop(npcId);
+      }, 800);
+      return;
+    }
+
+    // Success — mark button and refresh money
+    const card = btn.closest('.shop-item');
+    btn.textContent = 'Bought!';
+    btn.classList.add('bought');
+    btn.disabled = true;
+    if (card) card.classList.add('just-bought');
+
+    // Update money display
+    if (this.shopMoney) {
+      this.shopMoney.textContent = `Money: $${result.moneyAfter}`;
+    }
+
+    // Fizzle message for used_charm
+    if (result.fizzled) {
+      const info = card?.querySelector('.shop-item-desc');
+      if (info) info.textContent = 'It fizzled! Nothing happened.';
+    }
+
+    // Refresh buy buttons (some may now be unaffordable)
+    setTimeout(() => {
+      const tableTarget = this.rogueRun.getCurrentTarget();
+      const inventory = this.shopSystem.getInventory(npcId, tableTarget);
+      const money = this.rogueRun.game.money;
+      this.shopItems.querySelectorAll('.shop-buy-btn').forEach(b => {
+        const itemCard = b.closest('.shop-item');
+        if (!itemCard) return;
+        const iid = itemCard.dataset.id;
+        const item = inventory.find(i => i.id === iid);
+        if (!item || b.classList.contains('bought')) return;
+        const cost = this.shopSystem.getItemCost(item, tableTarget);
+        const canBuy = this.shopSystem.canAfford(money, item, tableTarget);
+        if (!canBuy) {
+          b.classList.add('cant-afford');
+          b.textContent = 'Expensive';
+          b.disabled = true;
+        }
+      });
+
+      if (this.shopMoney) {
+        this.shopMoney.textContent = `Money: $${money}`;
+      }
+    }, 600);
+  }
+
+  // ─── DICE PICK OVERLAY ─────────────────────────────────
+
+  /**
+   * Display the dice-hand pick overlay with durability bars,
+   * cracked indicators, and pick/unpick toggle for exactly 2 slots.
+   */
+  showDicePick() {
+    if (!this.dicePickOverlay || !this.dicePickSlots) return;
+
+    const slots = this.rogueRun.diceHandSlots;
+    this._pickedSlots = [];
+
+    this.dicePickSlots.innerHTML = slots.map((s, i) => {
+      const def = s.type;
+      const cracked = s.durability === 0;
+      const maxDur = def ? def.durability : 1;
+      const pct = cracked ? 0 : Math.min((s.durability / maxDur) * 100, 100);
+      const durabClass = pct >= 60 ? 'high' : pct >= 30 ? 'medium' : 'low';
+      const delay = i * 0.08;
+
+      return `<div class="dice-slot ${cracked ? 'cracked' : ''}" data-index="${i}" style="--enter-delay: ${delay}s">
+        ${cracked ? '<span class="cracked-indicator">cracked</span>' : ''}
+        <div class="dice-slot-emoji">🎲</div>
+        <div class="dice-slot-type">${def ? def.name : '???'}</div>
+        <div class="dice-slot-durability">
+          <div class="dice-slot-durability-bar">
+            <div class="dice-slot-durability-fill ${durabClass}" style="width:${pct}%"></div>
+          </div>
+          <span class="dice-slot-durability-label">${s.durability}/${maxDur}</span>
+        </div>
+        <div class="dice-slot-effect">${cracked ? 'Cracked \u2014 no effect, 20% lose $2' : (def ? def.effect : '')}</div>
+      </div>`;
+    }).join('');
+
+    // Attach click handlers for pick/unpick
+    this.dicePickSlots.querySelectorAll('.dice-slot:not(.cracked)').forEach(card => {
+      card.addEventListener('click', () => {
+        const idx = parseInt(card.dataset.index, 10);
+        if (card.classList.contains('picked')) {
+          // Unpick
+          card.classList.remove('picked');
+          this._pickedSlots = this._pickedSlots.filter(i => i !== idx);
+        } else if (this._pickedSlots.length < 2) {
+          // Pick
+          card.classList.add('picked');
+          this._pickedSlots.push(idx);
+        }
+
+        if (this.dicePickConfirm) {
+          this.dicePickConfirm.disabled = this._pickedSlots.length !== 2;
+        }
+      });
+    });
+
+    if (this.dicePickConfirm) {
+      this.dicePickConfirm.disabled = true;
+    }
+
+    requestAnimationFrame(() => {
+      this.dicePickOverlay.classList.add('visible');
+    });
+  }
+
+  /** Dismiss the dice-pick overlay and reset picked slots */
+  hideDicePick() {
+    if (this.dicePickOverlay) {
+      this.dicePickOverlay.classList.remove('visible');
+    }
+    this._pickedSlots = [];
+  }
+
+  // ─── VOW SELECTION OVERLAY ──────────────────────────
+
+  /**
+   * Display the vow selection overlay with glassmorphism cards for each burden.
+   * Each card shows the vow name, description, and bonus. Clicking a card
+   * calls metaProgress.setVow() and proceeds with the new-run flow.
+   * If the user already has an activeVow, skip overlay and proceed directly.
+   *
+   * @param {Function} onComplete - Callback invoked after vow selection or skip
+   */
+  showVowSelect(onComplete) {
+    if (!this.vowSelectOverlay || !this.vowSelectCards) {
+      if (onComplete) onComplete();
+      return;
+    }
+
+    // Check if a vow is already active — skip overlay
+    const meta = this.rogueRun.meta;
+    if (!meta || meta.getVow()) {
+      if (onComplete) onComplete();
+      return;
+    }
+
+    this._vowOnComplete = onComplete;
+
+    // Build vow cards with staggered entrance animation
+    this.vowSelectCards.innerHTML = VOW_DEFS.map((v, i) => {
+      const delay = i * 0.08;
+      const bonusText = this._formatVowBonus(v.bonus);
+      return `<div class="vow-card" data-id="${v.id}" style="--enter-delay: ${delay}s">
+        <div class="vow-card-name">${v.name}</div>
+        <div class="vow-card-desc">${v.desc}</div>
+        <div class="vow-card-bonus">${bonusText}</div>
+      </div>`;
+    }).join('');
+
+    // Attach click handlers for vow selection
+    this.vowSelectCards.querySelectorAll('.vow-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const vowId = card.dataset.id;
+        if (meta.setVow(vowId)) {
+          // Add selected styling before hiding
+          this.vowSelectCards.querySelectorAll('.vow-card').forEach(c => c.classList.remove('selected'));
+          card.classList.add('selected');
+          setTimeout(() => {
+            this.hideVowSelect();
+            if (this._vowOnComplete) {
+              const cb = this._vowOnComplete;
+              this._vowOnComplete = null;
+              cb();
+            }
+          }, 200);
+        }
+      });
+    });
+
+    // Show overlay with requestAnimationFrame for smooth transition
+    requestAnimationFrame(() => {
+      this.vowSelectOverlay.classList.add('visible');
+    });
+  }
+
+  /**
+   * Format the vow bonus object into a human-readable string.
+   * Maps bonus keys like `extraUpgrades`, `startingMoneyMult`, `xpMultiplier`,
+   * and `extraUpgradePerTable` to concise display text.
+   *
+   * @param {object} bonus - Bonus values from VOW_DEFS entry
+   * @returns {string} Formatted bonus display text
+   */
+  _formatVowBonus(bonus) {
+    const parts = [];
+    if (bonus.extraUpgrades) parts.push(`+${bonus.extraUpgrades} free upgrades`);
+    if (bonus.extraUpgradePerTable) parts.push(`+${bonus.extraUpgradePerTable} upgrade per table`);
+    if (bonus.startingMoneyMult) {
+      const pct = Math.round((bonus.startingMoneyMult - 1) * 100);
+      parts.push(`+${pct}% starting money`);
+    }
+    if (bonus.xpMultiplier) parts.push(`${bonus.xpMultiplier}x XP`);
+    return parts.join(' · ');
+  }
+
+  /** Dismiss the vow selection overlay and release the onComplete callback */
+  hideVowSelect() {
+    if (this.vowSelectOverlay) {
+      this.vowSelectOverlay.classList.remove('visible');
+    }
+    // Don't clear _vowOnComplete here — let the consuming flow handle it
+  }
+
+  /**
+   * Start a new run, optionally gated by vow selection.
+   * If no activeVow is set and meta-progression is available, show the
+   * vow selection overlay first. Otherwise, proceed directly to the
+   * full new-run flow. Called from _rehookNewGame and onNewRun callback.
+   */
+  startNewRun() {
+    const meta = this.rogueRun.meta;
+
+    // If a vow is already active, or meta isn't available, proceed directly
+    if (!meta || meta.getVow()) {
+      this._continueNewRun();
+      return;
+    }
+
+    // Show vow selection — _continueNewRun is called on selection or skip
+    this.showVowSelect(() => {
+      this._continueNewRun();
+    });
+  }
+
+  /**
+   * Execute the full new-run flow: fetch bonuses, reset run, clear pot,
+   * sync dice hand, hide all overlays, sync UI, and fire onNewRun callback.
+   * Called after vow selection (or immediately if vow already active, or
+   * from the No Vow skip button).
+   */
+  _continueNewRun() {
+    const freshBonuses = this.rogueRun.meta ? this.rogueRun.meta.getBonuses() : {};
+    this.rogueRun.resetRun(freshBonuses);
+    this.hideGameOver();
+    this.hide();
+    this.hideShop();
+    this.hideVowSelect();
+    this.hideMap();
+    this.hideMap();
+    this.sync();
+    // Also sync the main HUD
+    this.ui.sync();
+    if (this.onNewRun) this.onNewRun();
+  }
+
   // ─── SYNC ALL UI ─────────────────────────────────────
 
+  /**
+   * Refresh all rogue UI elements: table badge, side pot,
+   * reroll tokens, meta XP bar, and delegate main HUD updates.
+   */
   sync() {
     const run = this.rogueRun;
     if (!this.statusEl) return;
 
-    const upgrades = run.getActiveUpgradeList();
-    const table = run.getCurrentTable();
-    const progress = Math.min(run.game.money / run.getCurrentTarget() * 100, 100);
-    const isBoss = table.boss;
+    // Delegate to main HUD
+    this.ui.updateTableProgress(run.game.money, run.getCurrentTarget(), run.isBossTable);
+    this.ui.updateBonusPanel(run.getActiveUpgradeList());
 
-    // Table display
+    const table = run.getCurrentTable();
+    const isBoss = table.boss;
+    const actName = MAP_ACTS[run.currentActIndex]?.name || '???';
+    const floorNum = run.currentFloorIndex + 1;
+
+    // Keep table display in rogue-info (compact badge with map context)
     if (this.tableEl) {
       this.tableEl.innerHTML = `
         <span class="table-badge ${isBoss ? 'boss' : ''}">
-          ${isBoss ? '⚔ ' : ''}T${table.id}/${getTotalTables()}
+          ${isBoss ? '⚔ ' : ''}${actName}
         </span>
-        <span class="table-name">${table.name}</span>
+        <span class="table-name">Floor ${floorNum}: ${table.name}</span>
       `;
     }
 
-    // Upgrade tags
-    let upgradeHTML = '';
-    if (upgrades.length > 0) {
-      upgradeHTML = `<div class="run-upgrades">${upgrades.map(u => {
-        const color = RARITY_COLORS[u.rarity] || '#888';
-        const chargeTag = u.charges > 0 ? ` <span class="run-charge">x${u.charges}</span>` : '';
-        return `<span class="run-upgrade" style="border-color: ${color}; color: ${color}" title="${u.description}">${u.name}${chargeTag}</span>`;
-      }).join(' ')}</div>`;
+    // Side pot display (keep this, it's unique to rogue-info)
+    let sidePotHTML = '';
+    if (run.sidePot > 0) {
+      sidePotHTML = `<div class="run-pot">pot: $${run.sidePot}</div>`;
     }
 
-    // Progress tiers
-    const tiers = [25, 50, 75, 100].map(t => {
-      const active = progress >= t ? 'active' : '';
-      return `<span class="progress-tier ${active}" style="left: ${t}%"></span>`;
-    }).join('');
-
+    // Build a compact status line for the run-status area
+    // (progress bar now in main HUD, so keep this minimal)
     this.statusEl.innerHTML = `
-      <div class="run-progress">
-        <div class="run-progress-fill" style="width: ${progress}%"></div>
-        ${tiers}
-        <div class="run-progress-label">$${run.game.money} / $${run.getCurrentTarget()}</div>
-      </div>
-      ${run.sidePot > 0 ? `<div class="run-pot">pot: $${run.sidePot}</div>` : ''}
-      ${upgradeHTML}
+      ${sidePotHTML}
     `;
 
-    // Reroll tokens
+    // Reroll tokens (keep in meta-foot)
     if (this.rerollEl) {
       this.rerollEl.textContent = run.rerollTokens > 0 ? `⟳ ${run.rerollTokens}` : '';
     }
 
-    // Meta display
+    // Meta display (keep in meta-foot)
     if (this.metaEl && run.meta) {
       const m = run.meta;
       const lvl = m.data.level;
@@ -266,6 +765,10 @@ export class RogueUI {
 
   // ─── RUN END SCREENS ────────────────────────────────
 
+  /**
+   * Display the bust (game over) screen with run summary,
+   * XP earned, and new-run button. Records run as a loss.
+   */
   showBust() {
     // Record run before showing
     this._recordRunEnd(false);
@@ -290,6 +793,10 @@ export class RogueUI {
     this._rehookNewGame();
   }
 
+  /**
+   * Display the run-won victory screen with run summary,
+   * side-pot payout, XP earned, and new-run button. Records run as a win.
+   */
   showRunWon() {
     // Record run before showing
     this._recordRunEnd(true);
@@ -332,6 +839,7 @@ export class RogueUI {
     setTimeout(() => banner.classList.add('show'), 100);
   }
 
+  /** Dismiss the game-over overlay and remove any level-up banners */
   hideGameOver() {
     document.getElementById('game-over').classList.remove('visible');
     // Remove level-up banners
@@ -340,6 +848,11 @@ export class RogueUI {
 
   // ─── INTERNALS ───────────────────────────────────────
 
+  /**
+   * Record a completed run in meta-progression: calc XP, add XP,
+   * store pending level-up for display in the end screen.
+   * @param {boolean} won - Whether the run was won
+   */
   _recordRunEnd(won) {
     const meta = this.rogueRun.meta;
     if (!meta) return;
@@ -353,6 +866,11 @@ export class RogueUI {
     this._lastXPEarned = xp;
   }
 
+  /**
+   * Generate XP and level-up HTML for end-of-run screens.
+   * Consumes the stored _lastXPEarned and _pendingLevelUp values.
+   * @returns {string} HTML string with XP earned and optional level-up banner
+   */
   _xpHTML() {
     const xp = this._lastXPEarned || 0;
     const lvl = this._pendingLevelUp;
@@ -364,32 +882,19 @@ export class RogueUI {
     `;
   }
 
+  /**
+   * Re-attach the new-run button handler to reset the run,
+   * hide all overlays, fetch fresh meta bonuses, and sync UI.
+   * Uses startNewRun() to gate behind vow selection if needed.
+   */
   _rehookNewGame() {
     const btn = document.getElementById('new-game-btn');
     const old = btn._listener;
     if (old) btn.removeEventListener('click', old);
     const handler = () => {
-      const freshBonuses = this.rogueRun.meta ? this.rogueRun.meta.getBonuses() : {};
-      this.rogueRun.resetRun(freshBonuses);
-      this.hideGameOver();
-      this.hide();
-      this.hideTableClear();
-      this.sync();
-      if (this.onNewRun) this.onNewRun();
+      this.startNewRun();
     };
     btn.addEventListener('click', handler);
     btn._listener = handler;
   }
 }
-
-// Perk definitions for the UI (matches meta-progress.js)
-const PERK_ITEMS = [
-  { id: 'starter_boost', name: 'Starter Boost',    desc: 'Start each run with +$10',        cost: 1, prerequisite: null },
-  { id: 'fat_stacks',    name: 'Fat Stacks',        desc: 'Start each run with +$25',        cost: 2, prerequisite: 'starter_boost' },
-  { id: 'reroll_basic',  name: 'Mulligan',           desc: '1 reroll token per run',         cost: 1, prerequisite: null },
-  { id: 'reroll_master', name: 'Double Mulligan',    desc: '2 reroll tokens per run',        cost: 2, prerequisite: 'reroll_basic' },
-  { id: 'extra_choice',  name: 'More Options',       desc: 'Pick from 4 upgrades instead of 3', cost: 2, prerequisite: null },
-  { id: 'interest',      name: 'Street Interest',    desc: '+$1 per hand played (passive)',   cost: 1, prerequisite: null },
-  { id: 'first_free',    name: 'First Pick Free',    desc: 'First upgrade each run is free', cost: 2, prerequisite: null },
-  { id: 'xp_boost',      name: 'Quick Learner',      desc: '2x XP gain',                     cost: 1, prerequisite: null },
-];
