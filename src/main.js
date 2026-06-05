@@ -544,6 +544,7 @@ function animate(time) {
         const allHitWall = dice.every(d => d.hitWall);
         if (!allHitWall) {
           game.deadThrow();
+          rogueRun.runState = 'BETTING';
           pot.clear();
           audio.playBounce();
           ui.showAnnouncement(callDead(), 'dead');
