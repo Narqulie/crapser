@@ -27,11 +27,11 @@ export class Game {
   }
 
   get canRoll() {
-    return !this.rolling && this.money >= this.bet;
+    return !this.rolling;
   }
 
   get bankrupt() {
-    return this.money < this.bet && this.phase === 'COME_OUT';
+    return this.money < 0 && this.phase === 'COME_OUT';
   }
 
   roll() {

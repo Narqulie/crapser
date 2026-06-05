@@ -290,6 +290,17 @@ dice.forEach((d, i) => {
 const game = new Game();
 const npcPool = new NPCPool();
 const ui = new UI(game, npcPool);
+ui.onNewGame = () => {
+  game.reset();
+  npcPool.reset();
+  pot.clear();
+  ui.hideGameOver();
+  dice.forEach((d, i) => {
+    d.hitWall = false;
+    hoverDie(d.body, i);
+  });
+  ui.sync();
+};
 let settleCount = 0;
 let resultPending = false;
 let rollStartTime = 0;
