@@ -152,64 +152,47 @@ html, body {
   pointer-events: none;
   white-space: nowrap;
   letter-spacing: 1px;
-}
 
-#dice-result.show {
-  opacity: 1;
-}
-
-#dice-result.announce-win {
-  color: #4caf50;
-  text-shadow: 0 0 30px rgba(76,175,80,0.4), 0 4px 20px rgba(0,0,0,0.9);
-}
-
-#dice-result.announce-loss {
-  color: #f44336;
-  text-shadow: 0 0 30px rgba(244,67,54,0.4), 0 4px 20px rgba(0,0,0,0.9);
-}
-
-#dice-result.announce-point {
-  color: #ffd700;
-  text-shadow: 0 0 30px rgba(255,215,0,0.4), 0 4px 20px rgba(0,0,0,0.9);
-}
-
-#dice-result.announce-dead {
-  color: #888;
-  font-size: 22px;
-  text-shadow: 0 4px 20px rgba(0,0,0,0.9);
+  &.show { opacity: 1; }
+  &.announce-win { color: #4caf50; text-shadow: 0 0 30px rgba(76,175,80,0.4), 0 4px 20px rgba(0,0,0,0.9); }
+  &.announce-loss { color: #f44336; text-shadow: 0 0 30px rgba(244,67,54,0.4), 0 4px 20px rgba(0,0,0,0.9); }
+  &.announce-point { color: #ffd700; text-shadow: 0 0 30px rgba(255,215,0,0.4), 0 4px 20px rgba(0,0,0,0.9); }
+  &.announce-dead { color: #888; font-size: 22px; text-shadow: 0 4px 20px rgba(0,0,0,0.9); }
 }
 
 #npcs {
   position: absolute;
-  top: 80px;
+  top: 60px;
   right: 24px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   align-items: flex-end;
   z-index: 5;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
 }
 
 .npc-card {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   background: rgba(0,0,0,0.65);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px;
-  padding: 10px 16px;
+  padding: 8px 14px;
   position: relative;
   min-width: 240px;
 }
 
 .npc-avatar {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   color: #fff;
   flex-shrink: 0;
@@ -219,19 +202,19 @@ html, body {
 .npc-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  line-height: 1.2;
+  gap: 1px;
+  line-height: 1.15;
 }
 
 .npc-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: bold;
   color: #ddd;
   letter-spacing: 0.5px;
 }
 
 .npc-money {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   color: #4caf50;
 }
@@ -241,7 +224,7 @@ html, body {
 }
 
 .npc-bet {
-  font-size: 13px;
+  font-size: 12px;
   color: #ffd700;
   font-weight: bold;
 }
@@ -250,6 +233,19 @@ html, body {
   content: 'bet ';
   font-weight: normal;
   color: #888;
+}
+
+.npc-bet.out {
+  color: #666;
+  font-weight: normal;
+  font-style: italic;
+}
+.npc-bet.out::before {
+  content: '';
+}
+
+.npc-card.out {
+  opacity: 0.5;
 }
 
 .npc-bubble {
@@ -332,48 +328,17 @@ html, body {
   justify-content: center;
   transition: all 0.15s ease;
   position: relative;
-}
 
-.bet-chip:hover {
-  transform: scale(1.12);
-  border-color: rgba(255,255,255,0.5);
-}
+  &:hover { transform: scale(1.12); border-color: rgba(255,255,255,0.5); }
+  &:active { transform: scale(0.95); }
+  &.active { border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.3); transform: scale(1.08); }
+  &:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
 
-.bet-chip:active {
-  transform: scale(0.95);
-}
-
-.bet-chip.active {
-  border-color: #fff;
-  box-shadow: 0 0 10px rgba(255,255,255,0.3);
-  transform: scale(1.08);
-}
-
-.bet-chip:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.bet-chip[data-amount="5"] {
-  background: #c0392b;
-  color: #fff;
-}
-.bet-chip[data-amount="10"] {
-  background: #2980b9;
-  color: #fff;
-}
-.bet-chip[data-amount="25"] {
-  background: #27ae60;
-  color: #fff;
-}
-.bet-chip[data-amount="50"] {
-  background: #8e44ad;
-  color: #fff;
-}
-.bet-chip[data-amount="100"] {
-  background: #b7950b;
-  color: #fff;
+  &[data-amount="5"] { background: #c0392b; color: #fff; }
+  &[data-amount="10"] { background: #2980b9; color: #fff; }
+  &[data-amount="25"] { background: #27ae60; color: #fff; }
+  &[data-amount="50"] { background: #8e44ad; color: #fff; }
+  &[data-amount="100"] { background: #b7950b; color: #fff; }
 }
 
 #stats-display {

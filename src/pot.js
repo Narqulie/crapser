@@ -229,13 +229,9 @@ export class Pot {
   }
 
   sync() {
-    for (const b of this.bills) {
-      b.mesh.position.copy(b.body.position);
-      b.mesh.quaternion.copy(b.body.quaternion);
-    }
-    for (const c of this.coins) {
-      c.mesh.position.copy(c.body.position);
-      c.mesh.quaternion.copy(c.body.quaternion);
+    for (const item of [...this.bills, ...this.coins]) {
+      item.mesh.position.copy(item.body.position);
+      item.mesh.quaternion.copy(item.body.quaternion);
     }
   }
 }

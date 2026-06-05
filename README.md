@@ -1,6 +1,6 @@
 # crapser
 
-A browser-based street craps game built with Three.js and Cannon-es. You're the shooter — aim, throw, and ride the pass line against four NPCs, all in a grimy 3D alley.
+A browser-based street craps game built with Three.js and Cannon-es. You're the shooter — aim, throw, and ride the pass line against six NPCs, all in a grimy 3D alley.
 
 ![screenshot](ss_asset.png)
 
@@ -16,7 +16,7 @@ Everything happens in one hand — no waiting for turns. You shoot until you sev
 
 ## the gimmicks
 
-- **4 NPCs** (Larry, Sal, Mike, Ruth) each with their own personality, betting style, and one-liners
+- **6 NPCs** — Lucky Larry, Sal the Stat, Big Mike, Old Ruth, Nervous Nick, Deadeye Diane — each with their own personality, betting style, and one-liners
 - **Dice combos** get called out by the announcer in proper craps slang — "Snake Eyes", "Little Joe from Kokomo", etc.
 - **Procedural audio** — all sounds are generated on the fly, no audio files
 - **Retro film grain + vignette** to make it feel like a 70s crime movie

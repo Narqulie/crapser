@@ -31,7 +31,7 @@ const CONTEXT_CALLS = {
   dead: ['No roll!', 'Didn\'t reach the back wall!', 'Gotta hit the wall, shooter!', 'Dead throw, try again!'],
 };
 
-function pick(arr) {
+export function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 

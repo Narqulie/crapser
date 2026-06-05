@@ -104,12 +104,16 @@ export class UI {
       const color = n.color;
       const moneyClass = n.money < n.bet ? 'broke' : '';
       const bubbleShow = n.bubble ? 'show' : '';
-      return `<div class="npc-card">
+      const outClass = !n.active ? 'out' : '';
+      const betDisplay = n.active
+        ? `<div class="npc-bet">$${n.bet}</div>`
+        : `<div class="npc-bet out">out</div>`;
+      return `<div class="npc-card ${outClass}">
         <div class="npc-avatar" style="background:${color}">${n.initials}</div>
         <div class="npc-info">
           <div class="npc-name">${n.name}</div>
           <div class="npc-money ${moneyClass}">$${n.money}</div>
-          <div class="npc-bet">$${n.bet}</div>
+          ${betDisplay}
         </div>
         <div class="npc-bubble ${bubbleShow}">${n.bubble || ''}</div>
       </div>`;

@@ -122,7 +122,4 @@ export class Game {
     this.bet = Math.min(Math.max(5, amount), 100);
   }
 
-  restart() {
-    this.reset();
-  }
 }

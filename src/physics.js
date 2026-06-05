@@ -53,10 +53,15 @@ export function isSettled(body) {
 }
 
 export function hoverDie(body, index) {
-  const x = index === 0 ? -0.6 : 0.6;
+  const x = index === 0 ? -0.75 : 0.75;
   body.position.set(x, 3, 1.5);
   body.velocity.set(0, 0, 0);
   body.angularVelocity.set(0, 0, 0);
+  body.quaternion.setFromEuler(
+    Math.random() * Math.PI * 2,
+    Math.random() * Math.PI * 2,
+    Math.random() * Math.PI * 2,
+  );
 }
 
 export function launchDie(body, vx, vy, vz) {

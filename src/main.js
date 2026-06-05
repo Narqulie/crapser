@@ -244,13 +244,24 @@ wallMesh.castShadow = true;
 wallMesh.receiveShadow = true;
 scene.add(wallMesh);
 
+const aimTargets = [ground, wallMesh];
+
+const farTarget = new THREE.Mesh(
+  new THREE.PlaneGeometry(24, 20),
+  new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide }),
+);
+farTarget.position.set(0, 4, -20);
+scene.add(farTarget);
+aimTargets.push(farTarget);
+
 const { world, wallBody, groundBody, dieMat } = createWorld();
 
 const pot = new Pot(scene, world, groundBody, dieMat);
 
-const DICE_OFFSET = 0.6;
+const DICE_OFFSET = 0.75;
 const HOVER_Y = 3;
 const HOVER_Z = 3.3;
+const BET_CHIPS = [5, 10, 25, 50, 100];
 
 const dice = [
   { mesh: createDie(), body: createDieBody(), hitWall: false },
@@ -284,10 +295,7 @@ let resultPending = false;
 let rollStartTime = 0;
 let hoverBob = 0;
 
-// --- Aiming ---
 const raycaster = new THREE.Raycaster();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const _point = new THREE.Vector3();
 let isAiming = false;
 let aimTarget = null;
 
@@ -305,87 +313,81 @@ const aimLine = new THREE.Line(aimLineGeo, aimLineMat);
 aimLine.visible = false;
 scene.add(aimLine);
 
-const targetRing = new THREE.Mesh(
-  new THREE.RingGeometry(0.08, 0.25, 24),
-  new THREE.MeshBasicMaterial({
-    color: 0xffd700,
+function makeTargetSprite() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.strokeStyle = 'rgba(255,215,0,0.8)';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(32, 4); ctx.lineTo(32, 26);
+  ctx.moveTo(32, 38); ctx.lineTo(32, 60);
+  ctx.moveTo(4, 32); ctx.lineTo(26, 32);
+  ctx.moveTo(38, 32); ctx.lineTo(60, 32);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(32, 32, 10, 0, Math.PI * 2);
+  ctx.stroke();
+  return new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(c),
     transparent: true,
-    opacity: 0.5,
-    side: THREE.DoubleSide,
-  }),
-);
-targetRing.rotation.x = -Math.PI / 2;
-targetRing.position.y = 0.02;
-targetRing.visible = false;
-scene.add(targetRing);
+    depthTest: false,
+  }));
+}
+const targetSprite = makeTargetSprite();
+targetSprite.scale.set(0.5, 0.5, 1);
+targetSprite.visible = false;
+scene.add(targetSprite);
 
-function getGroundPoint(event) {
+function getAimPoint(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   const mx = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   const my = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
-  if (raycaster.ray.intersectPlane(groundPlane, _point)) {
-    return { x: _point.x, z: _point.z };
-  }
+  const hits = raycaster.intersectObjects(aimTargets);
+  if (hits.length > 0) return hits[0].point;
   return null;
 }
 
 function updateAimVisual() {
   if (!aimTarget) return;
-  const { x: tx, z: tz } = aimTarget;
 
   aimLinePositions[0] = 0;
   aimLinePositions[1] = HOVER_Y;
   aimLinePositions[2] = HOVER_Z;
-  aimLinePositions[3] = tx;
-  aimLinePositions[4] = 0;
-  aimLinePositions[5] = tz;
+  aimLinePositions[3] = aimTarget.x;
+  aimLinePositions[4] = aimTarget.y;
+  aimLinePositions[5] = aimTarget.z;
   aimLine.geometry.attributes.position.needsUpdate = true;
   aimLine.geometry.computeBoundingSphere();
   aimLine.computeLineDistances();
 
-  targetRing.position.x = tx;
-  targetRing.position.z = tz;
+  targetSprite.position.copy(aimTarget);
 
-  const dx = tx - 0;
-  const dz = tz - HOVER_Z;
+  const dx = aimTarget.x;
+  const dz = aimTarget.z - HOVER_Z;
   const dist = Math.sqrt(dx * dx + dz * dz);
   ui.setPower(Math.min(dist / 18, 1));
 }
 
 function hideAimVisual() {
   aimLine.visible = false;
-  targetRing.visible = false;
+  targetSprite.visible = false;
   ui.hidePower();
 }
 
-function aimThrow() {
-  if (!aimTarget) return;
-  const dx = aimTarget.x - 0;
-  const dz = aimTarget.z - HOVER_Z;
-  const dist = Math.sqrt(dx * dx + dz * dz);
-  if (dist < 0.3) return;
-
+function doThrow(getVelocity) {
   if (!game.roll()) return;
   npcPool.placeBets();
   pot.setBet(game.bet + npcPool.totalBet);
-  audio.init();
   audio.playRoll();
-
-  const dirX = dx / dist;
-  const dirZ = dz / dist;
-  const speed = THREE.MathUtils.clamp(dist * 1.2, 0.3, 16);
-  const vy = 1 + dist * 0.5;
 
   dice.forEach((d, i) => {
     d.hitWall = false;
     const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
     d.body.position.set(side, HOVER_Y, HOVER_Z);
-    launchDie(d.body,
-      dirX * speed + (i === 0 ? -0.3 : 0.3),
-      vy,
-      dirZ * speed,
-    );
+    const v = getVelocity(i);
+    launchDie(d.body, v[0], v[1], v[2]);
   });
 
   settleCount = 0;
@@ -395,10 +397,28 @@ function aimThrow() {
   ui.sync();
 }
 
+function aimThrow() {
+  if (!aimTarget) return;
+  const dx = aimTarget.x;
+  const dz = aimTarget.z - HOVER_Z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  if (dist < 0.3) return;
+
+  const dirX = dx / dist;
+  const dirZ = dz / dist;
+  const speed = THREE.MathUtils.clamp(dist * 1.2, 0.3, 16);
+  const vy = 1 + dist * 0.5;
+
+  doThrow((i) => [
+    dirX * speed + (i === 0 ? -0.3 : 0.3),
+    vy,
+    dirZ * speed,
+  ]);
+}
+
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
   if (game.rolling || game.bankrupt || !game.canRoll) return;
-  audio.init();
 
   dice.forEach((d, i) => {
     if (d.body.position.y < 0.5) hoverDie(d.body, i);
@@ -407,16 +427,16 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   isAiming = true;
   controls.enabled = false;
   renderer.domElement.style.cursor = 'crosshair';
-  const p = getGroundPoint(e);
+  const p = getAimPoint(e);
   if (p) aimTarget = p;
   aimLine.visible = true;
-  targetRing.visible = true;
+  targetSprite.visible = true;
   updateAimVisual();
 });
 
 renderer.domElement.addEventListener('pointermove', (e) => {
   if (!isAiming) return;
-  const p = getGroundPoint(e);
+  const p = getAimPoint(e);
   if (!p) return;
   aimTarget = p;
   updateAimVisual();
@@ -439,37 +459,20 @@ renderer.domElement.addEventListener('pointerleave', () => {
 });
 
 function forwardThrow() {
-  if (game.rolling || !game.canRoll || game.bankrupt) return;
-  if (!game.roll()) return;
-  npcPool.placeBets();
-  pot.setBet(game.bet + npcPool.totalBet);
-  audio.init();
-  audio.playRoll();
-
-  dice.forEach((d, i) => {
-    d.hitWall = false;
-    const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
-    d.body.position.set(side, HOVER_Y, HOVER_Z);
-    launchDie(d.body,
-      i === 0 ? -0.3 : 0.3,
-      5,
-      -8,
-    );
-  });
-
-  settleCount = 0;
-  resultPending = false;
-  rollStartTime = Date.now();
-  hideAimVisual();
-  ui.sync();
+  if (game.rolling || game.bankrupt || !game.canRoll) return;
+  doThrow((i) => [
+    i === 0 ? -0.3 : 0.3,
+    5,
+    -8,
+  ]);
 }
 
-let _lastTime = 0;
+let lastTime = 0;
 function animate(time) {
   requestAnimationFrame(animate);
 
-  const dt = _lastTime ? Math.min((time - _lastTime) / 1000, 0.05) : 1 / 60;
-  _lastTime = time;
+  const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 1 / 60;
+  lastTime = time;
 
   world.step(1 / 60, 1 / 60, 3);
 
@@ -578,19 +581,17 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
     e.preventDefault();
-    const chips = [5, 10, 25, 50, 100];
-    const idx = chips.indexOf(game.bet);
-    if (idx < chips.length - 1) {
-      game.setBet(chips[idx + 1]);
+    const idx = BET_CHIPS.indexOf(game.bet);
+    if (idx < BET_CHIPS.length - 1) {
+      game.setBet(BET_CHIPS[idx + 1]);
       ui.sync();
     }
   }
   if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
     e.preventDefault();
-    const chips = [5, 10, 25, 50, 100];
-    const idx = chips.indexOf(game.bet);
+    const idx = BET_CHIPS.indexOf(game.bet);
     if (idx > 0) {
-      game.setBet(chips[idx - 1]);
+      game.setBet(BET_CHIPS[idx - 1]);
       ui.sync();
     }
   }

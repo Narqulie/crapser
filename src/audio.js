@@ -3,16 +3,14 @@ export class AudioManager {
     this.ctx = null;
   }
 
-  init() {
-    if (this.ctx) return;
-    try {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-    } catch {}
-  }
-
   ensure() {
-    if (!this.ctx) this.init();
-    if (this.ctx?.state === 'suspended') this.ctx.resume();
+    if (!this.ctx) {
+      try {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      } catch { return false; }
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return true;
   }
 
   noise(duration, volume, highpass) {
@@ -39,32 +37,20 @@ export class AudioManager {
     src.start();
   }
 
-  playRoll() {
-    this.ensure();
-    if (!this.ctx) return;
-    this.noise(0.25, 0.07, 400);
-  }
-
-  playBounce() {
-    this.ensure();
-    if (!this.ctx) return;
-    this.noise(0.06, 0.1, 800);
-  }
+  playRoll() { if (!this.ensure()) return; this.noise(0.25, 0.07, 400); }
+  playBounce() { if (!this.ensure()) return; this.noise(0.06, 0.1, 800); }
 
   playSettle() {
-    this.ensure();
-    if (!this.ctx) return;
+    if (!this.ensure()) return;
     const t = this.ctx.currentTime;
     for (const freq of [600, 420]) {
       const osc = this.ctx.createOscillator();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, t);
       osc.frequency.exponentialRampToValueAtTime(freq * 0.4, t + 0.05);
-
       const gain = this.ctx.createGain();
       gain.gain.setValueAtTime(0.05, t);
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(t);
@@ -73,20 +59,17 @@ export class AudioManager {
   }
 
   playWin() {
-    this.ensure();
-    if (!this.ctx) return;
+    if (!this.ensure()) return;
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(523, t);
     osc.frequency.setValueAtTime(659, t + 0.08);
     osc.frequency.setValueAtTime(784, t + 0.16);
-
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.06, t);
     gain.gain.setValueAtTime(0.06, t + 0.22);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
-
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start(t);
@@ -94,18 +77,15 @@ export class AudioManager {
   }
 
   playLose() {
-    this.ensure();
-    if (!this.ctx) return;
+    if (!this.ensure()) return;
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(350, t);
     osc.frequency.exponentialRampToValueAtTime(120, t + 0.3);
-
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0.04, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-
     osc.connect(gain);
     gain.connect(this.ctx.destination);
     osc.start(t);
