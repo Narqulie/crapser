@@ -22,4 +22,5 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 47aba4286a4f0a7f1117839b0326c2cf
           command: pages deploy dist --project-name=crapser --branch=main
