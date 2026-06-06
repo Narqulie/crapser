@@ -14,8 +14,8 @@ const STORAGE_KEY = 'crapser_meta';
 const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000];
 
 export const PERKS = [
-  { id: 'starter_boost', name: 'Starter Boost',    desc: 'Start each run with +$10',        cost: 1, prerequisite: null },
-  { id: 'fat_stacks',    name: 'Fat Stacks',        desc: 'Start each run with +$25',        cost: 2, prerequisite: 'starter_boost' },
+  { id: 'starter_boost', name: 'Starter Boost',    desc: 'Start each run with +₡2',        cost: 1, prerequisite: null },
+  { id: 'fat_stacks',    name: 'Fat Stacks',        desc: 'Start each run with +₡5',        cost: 2, prerequisite: 'starter_boost' },
   { id: 'reroll_basic',  name: 'Mulligan',           desc: '1 reroll token per run',         cost: 1, prerequisite: null },
   { id: 'reroll_master', name: 'Double Mulligan',    desc: '2 reroll tokens per run',        cost: 2, prerequisite: 'reroll_basic' },
   { id: 'extra_choice',  name: 'More Options',       desc: 'Pick from 4 upgrades instead of 3', cost: 2, prerequisite: null },
@@ -50,10 +50,10 @@ export const VOW_DEFS = [
   {
     id: 'speed_run',
     name: 'Speed Run',
-    desc: '5 hands per table max. Double XP.',
+    desc: '7 hands per table max. Double XP.',
     effect: 'hand_limit',
     bonus: { xpMultiplier: 2 },
-    limit: 5,
+    limit: 7,
   },
   {
     id: 'purist',
@@ -134,7 +134,7 @@ export class MetaProgress {
 
   /** Calculate XP earned from a completed run */
   calcRunXP(money, tablesCleared, upgradesCount, won) {
-    let xp = Math.floor(money / 5);
+    let xp = money;
     xp += tablesCleared * 50;
     xp += upgradesCount * 10;
     if (won) xp += 200;
@@ -177,7 +177,7 @@ export class MetaProgress {
   /** Get bonuses to apply at run start */
   getBonuses() {
     return {
-      startingMoney: (this.hasPerk('fat_stacks') ? 25 : this.hasPerk('starter_boost') ? 10 : 0),
+      startingMoney: (this.hasPerk('fat_stacks') ? 5 : this.hasPerk('starter_boost') ? 2 : 0),
       rerollTokens: (this.hasPerk('reroll_master') ? 2 : this.hasPerk('reroll_basic') ? 1 : 0),
       extraPick: this.hasPerk('extra_choice') ? 1 : 0,
       interestPerHand: this.hasPerk('interest') ? 1 : 0,
@@ -234,16 +234,16 @@ export class MetaProgress {
 
   /**
    * Get trust level (1-5) for an NPC based on spending thresholds.
-   * T1: $0, T2: $100, T3: $500, T4: $1500, T5: $5000
+   * T1: $0, T2: $20, T3: $100, T4: $300, T5: $1000
    */
   getTrustLevel(npcId) {
     const spent = this.getTrust(npcId);
     const levels = [
       { level: 1, threshold: 0 },
-      { level: 2, threshold: 100 },
-      { level: 3, threshold: 500 },
-      { level: 4, threshold: 1500 },
-      { level: 5, threshold: 5000 },
+      { level: 2, threshold: 20 },
+      { level: 3, threshold: 100 },
+      { level: 4, threshold: 300 },
+      { level: 5, threshold: 1000 },
     ];
     let current = 1;
     for (const l of levels) {

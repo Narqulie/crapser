@@ -158,24 +158,24 @@ export class UI {
     if (!this.resultCard || !this.resultCardInner) return;
 
     const absNet = Math.abs(netChange);
-    const headerText = result === 'win' ? `WIN +$${absNet}` :
-      result === 'loss' ? `LOSS -$${absNet}` :
-      `PUSH $0`;
+    const headerText = result === 'win' ? `WIN +₡${absNet}` :
+      result === 'loss' ? `LOSS -₡${absNet}` :
+      `PUSH ₡0`;
     this.resultHeader.textContent = headerText;
     this.resultHeader.className = 'result-header';
 
     // Build breakdown items
     let breakdownHtml = '';
-    breakdownHtml += `<div class="result-item"><span class="label">Bet</span><span class="value negative">-$${bet}</span></div>`;
+    breakdownHtml += `<div class="result-item"><span class="label">Bet</span><span class="value negative">-₡${bet}</span></div>`;
 
     if (payout > 0 || result === 'push') {
       const payoutClass = payout > 0 ? 'positive' : 'neutral';
-      breakdownHtml += `<div class="result-item"><span class="label">Payout</span><span class="value ${payoutClass}">+$${payout}</span></div>`;
+      breakdownHtml += `<div class="result-item"><span class="label">Payout</span><span class="value ${payoutClass}">+₡${payout}</span></div>`;
     }
 
     if (bonuses && bonuses.length > 0) {
       bonuses.forEach(b => {
-        breakdownHtml += `<div class="result-item"><span class="label">${b.name}</span><span class="value positive">+$${b.amount}</span></div>`;
+        breakdownHtml += `<div class="result-item"><span class="label">${b.name}</span><span class="value positive">+₡${b.amount}</span></div>`;
       });
     }
 
@@ -184,7 +184,7 @@ export class UI {
     // Net change line
     const netSign = netChange >= 0 ? '+' : '';
     const netClass = netChange > 0 ? 'positive' : netChange < 0 ? 'negative' : 'neutral';
-    this.resultNet.textContent = `NET ${netSign}$${netChange}`;
+    this.resultNet.textContent = `NET ${netSign}₡${netChange}`;
     this.resultNet.className = `result-net ${netClass}`;
 
     // Apply result type class for border/glow coloring
@@ -214,7 +214,7 @@ export class UI {
     if (!this.tableProgress || !this.tableProgressFill || !this.tableProgressLabel) return;
     const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
     this.tableProgressFill.style.width = `${pct}%`;
-    this.tableProgressLabel.textContent = `$${current} / $${target}`;
+    this.tableProgressLabel.textContent = `₡${current} / ₡${target}`;
     if (isBoss) {
       this.tableProgress.classList.add('boss');
     } else {
@@ -304,9 +304,9 @@ export class UI {
     this.pointEl.textContent = '';
 
     // Triple-bar money display
-    if (this.moneyValue) this.moneyValue.textContent = `$${this.game.money}`;
-    if (this.betValue) this.betValue.textContent = `$${this.game.bet}`;
-    if (this.payoutValue) this.payoutValue.textContent = `$${this.calculatePayout()}`;
+    if (this.moneyValue) this.moneyValue.textContent = `₡${this.game.money}`;
+    if (this.betValue) this.betValue.textContent = `₡${this.game.bet}`;
+    if (this.payoutValue) this.payoutValue.textContent = `₡${this.calculatePayout()}`;
 
     this.betChips.forEach(chip => {
       const val = parseInt(chip.dataset.amount);

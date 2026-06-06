@@ -26,13 +26,6 @@
  * @private
  * @type {Array<{id: number, name: string, target: number, minBet: number, boss: boolean, bossName?: string}>}
  */
-const TABLE_CONFIGS = [
-  { id: 1, name: 'Back Alley',    target: 200,  minBet: 5,  boss: false },
-  { id: 2, name: 'Side Street',   target: 400,  minBet: 10, boss: false },
-  { id: 3, name: 'Midtown',       target: 600,  minBet: 15, boss: false },
-  { id: 4, name: 'The Strip',     target: 800,  minBet: 20, boss: false },
-  { id: 5, name: 'The House',     target: 1000, minBet: 25, boss: true, bossName: 'Pit Boss' },
-];
 
 /**
  * Difficulty traits per table — scaling modifiers applied during the roguelike run.
@@ -87,7 +80,7 @@ export const UPGRADES = [
   {
     id: 'lucky_7s',
     name: 'Lucky 7s',
-    description: 'Rolling 7 on come-out pays +$2 bonus',
+    description: 'Rolling 7 on come-out pays +₡1 bonus',
     category: 'dice',
     rarity: 'common',
   },
@@ -140,7 +133,7 @@ export const UPGRADES = [
   {
     id: 'face_off',
     name: 'Face-Off',
-    description: 'Doubles pay +$10 bonus',
+    description: 'Doubles pay +₡2 bonus',
     category: 'dice',
     rarity: 'uncommon',
   },
@@ -168,14 +161,14 @@ export const UPGRADES = [
   {
     id: 'pocket_change',
     name: 'Pocket Change',
-    description: 'Each win pays +$2 extra',
+    description: 'Each win pays +₡1 extra',
     category: 'bet',
     rarity: 'common',
   },
   {
     id: 'lucky_11',
     name: 'Lucky 11',
-    description: 'Natural 11 on come-out pays +$3 bonus',
+    description: 'Natural 11 on come-out pays +₡1 bonus',
     category: 'bet',
     rarity: 'common',
   },
@@ -249,7 +242,7 @@ export const UPGRADES = [
   {
     id: 'escape_plan',
     name: 'Escape Plan',
-    description: 'Once: when you would bust, survive with $5 instead',
+    description: 'Once: when you would bust, survive with ₡1 instead',
     category: 'charm',
     rarity: 'common',
     maxCharges: 1,
@@ -299,28 +292,28 @@ export const UPGRADES = [
   {
     id: 'loan_shark',
     name: 'Loan Shark',
-    description: 'You can go to -$50 before busting',
+    description: 'You can go to -₡10 before busting',
     category: 'talent',
     rarity: 'common',
   },
   {
     id: 'high_roller',
     name: 'High Roller',
-    description: 'Start the run with +$25 extra',
+    description: 'Start the run with +₡5 extra',
     category: 'talent',
     rarity: 'common',
   },
   {
     id: 'sharp',
     name: 'Sharp',
-    description: 'On any loss, get $1 back',
+    description: 'On any loss, get ₡1 back',
     category: 'talent',
     rarity: 'common',
   },
   {
     id: 'collector',
     name: 'Collector',
-    description: '+$10 whenever you add an upgrade',
+    description: '+₡2 whenever you add an upgrade',
     category: 'talent',
     rarity: 'common',
   },
@@ -329,7 +322,7 @@ export const UPGRADES = [
   {
     id: 'bookie',
     name: 'Bookie',
-    description: 'Every roll pays $1, no matter what',
+    description: 'Every roll pays ₡1, no matter what',
     category: 'talent',
     rarity: 'uncommon',
   },
@@ -345,7 +338,7 @@ export const UPGRADES = [
   {
     id: 'iron_bank',
     name: 'Iron Bank',
-    description: 'Every 3 hands played, collect +$5 passive income',
+    description: 'Every 3 hands played, collect +₡1 passive income',
     category: 'talent',
     rarity: 'rare',
   },
@@ -398,30 +391,6 @@ export function getAvailableUpgrades(excludeIds, categoryWeights) {
   return weighted;
 }
 
-/**
- * Get the table config at a given index, clamped to the last table.
- * **Deprecated**: use {@link module:map~getNode} and node-based progression instead.
- * Kept for backward compat until rogue-run.js migrates to map.js.
- *
- * @param {number} index — 0-based table index
- * @returns {object} table config with `id`, `name`, `target`, `minBet`, `boss`
- * @deprecated Table progression migrated to src/map.js MAP_ACTS
- */
-export function getTable(index) {
-  return TABLE_CONFIGS[Math.min(index, TABLE_CONFIGS.length - 1)];
-}
-
-/**
- * Total number of tables in the legacy run progression.
- * **Deprecated**: use {@link module:map~MAP_ACTS} act/floor structure instead.
- * Kept for backward compat until rogue-ui.js migrates to map.js.
- *
- * @returns {number} always 5 (legacy table count)
- * @deprecated Table progression migrated to src/map.js MAP_ACTS
- */
-export function getTotalTables() {
-  return TABLE_CONFIGS.length;
-}
 
 // ========== SYNERGIES (SET BONUSES PER CATEGORY) ============================
 
@@ -465,7 +434,7 @@ export const SYNERGIES = {
   },
   talent: {
     set2: {
-      description: '+$2 passive income per roll',
+      description: '+₡1 passive income per roll',
       implNote: 'Each roll grants an additional $2 passive income',
     },
     set3: {
@@ -484,10 +453,6 @@ export const SYNERGIES = {
  * @type {Array<{pair: string[], nerf: string}>}
  */
 export const ANTI_SYNERGIES = [
-  {
-    pair: ['loaded_dice', 'precision'],
-    nerf: 'Lose 1 re-roll per hand',
-  },
   {
     pair: ['double_down', 'loan_shark'],
     nerf: 'All payouts reduced by 10%',

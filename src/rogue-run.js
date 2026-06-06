@@ -1,22 +1,20 @@
 import { Game } from './game.js';
 import { UPGRADES, getAvailableUpgrades, getActiveSynergies, TABLE_TRAITS } from './upgrades.js';
-import { DiceHand, getStartingHand, getDieType, isCracked } from './dice-types.js';
-import { NPC_DEFS } from './npcs.js';
-import { VOW_DEFS } from './meta-progress.js';
+import { DiceHand, getStartingHand, getDieType, isCracked, crackedEffect } from './dice-types.js';
+import { VOW_DEFS, RESULT_CARD_DELAY, RESULT_CARD_DISPLAY } from './meta-progress.js';
 import { MAP_ACTS, getNode, getFloorNodes, getNextFloors, isActComplete } from './map.js';
 
 /**
  * RogueRun wraps a Game instance with roguelite progression.
  *
  * States:
- *   MAP_NAV    — choosing a node on the map overlay
- *   BETTING    — player can set bet and roll
- *   DICE_PICK  — pick 2 of 4 dice before roll
- *   ROLLING    — dice physics in progress
- *   PICKING    — choose-1-of-3 overlay shown
- *   SHOPPING   — visiting a shop (overlay shown)
- *   BUST       — run lost (money <= threshold)
- *   RUN_WON    — run won (money >= target on final boss)
+ *   MAP_NAV          — choosing a node on the map overlay
+ *   TABLE_START_LOCK — pick 2 dice to lock for entire table
+ *   BETTING          — player can set bet and roll
+ *   ROLLING          — dice physics in progress
+ *   SHOPPING         — visiting a shop (overlay shown)
+ *   BUST             — run lost (money <= threshold)
+ *   RUN_WON          — run won (money >= target on final boss)
  */
 export class RogueRun {
   /**
@@ -46,7 +44,6 @@ export class RogueRun {
 
     this.activeUpgrades = new Map();
     this.handCount = 0;
-    this._handsSinceShop = 0;     // track hands between shop visits
     this.streak = 0;
     this.sidePot = 0;
     this.bonusPot = 0;
@@ -56,6 +53,9 @@ export class RogueRun {
     this.visitedNodes = new Set();
     this.runState = 'MAP_NAV';
     this.diceHand = new DiceHand(getStartingHand());
+    this.diceHand.lockedSlots.clear();
+    this._debtCounter = 0;
+    this._witnessPrediction = null;
     this._lastResult = null;
     this._lastSum = null;
     this._lastPreviousPoint = null;
@@ -65,12 +65,13 @@ export class RogueRun {
     this._firePoints = new Set();
     this._ironBankCounter = 0;
     this._perksUsedFree = 0;
-    this._sevenDieUsedThisHand = false;
+    this._mapNavBlockedUntil = 0;
     this._synergyRerolls = 0;
     this._synergies = null;
     this._unluckyBonus = false;   // unlucky streak flag: next roll gets +15% re-roll
-    this._hustlerWins = {};       // { slotIndex: winCount } for Hustler die tracking
+    this._mapNavBlockedUntil = 0;   // block MAP_NAV until result card anim finishes
     this._hustlerFreePick = false; // flag: Hustler just earned a free pick
+    this._pendingTableClearPicks = 0; // upgrades remaining from table/boss clear pick
     this.pendingShops = [];       // NPC IDs queued for shop visits
     this.currentShopNpc = null;   // currently visiting NPC (null if none)
 
@@ -82,7 +83,7 @@ export class RogueRun {
 
     // Apply starting-money upgrades
     if (this.activeUpgrades.has('high_roller')) {
-      this.game.money += 25;
+      this.game.money += 5;
     }
 
     // Min bet set to default until player selects a node
@@ -123,15 +124,15 @@ export class RogueRun {
           break;
         }
         case 'cracked_standards': {
-          // Glass Jaw: all Standard dice start cracked (durability 0)
+          // Glass Jaw: all house bones dice start cracked (durability 0)
           for (const slot of this.diceHand.slots) {
-            if (slot.typeId === 'standard') {
+            if (slot.typeId === 'house_bones') {
               slot.durability = 0;
             }
           }
           // Glass Jaw: +50% starting money (bank + additional on top of meta bonuses)
           this.game.money = Math.floor(this.game.money * this.vow.bonus.startingMoneyMult);
-          this.game.message = 'Glass Jaw: standards cracked, +50% money';
+          this.game.message = 'Glass Jaw: house bones cracked, +50% money';
           break;
         }
         default:
@@ -185,7 +186,7 @@ export class RogueRun {
    * @type {boolean}
    */
   get canRoll() {
-    return (this.runState === 'BETTING' || this.runState === 'DICE_PICK') && this.game.canRoll && !this.game.bankrupt;
+    return this.runState === 'BETTING' && this.game.canRoll && !this.game.bankrupt;
   }
 
   /**
@@ -194,7 +195,7 @@ export class RogueRun {
    * @type {number}
    */
   get bustThreshold() {
-    if (this.activeUpgrades.has('loan_shark')) return -50;
+    if (this.activeUpgrades.has('loan_shark')) return -10;
     return 0;
   }
 
@@ -311,7 +312,8 @@ export class RogueRun {
             this.game.message = `Purist: free ${pick.name}!`;
           }
         }
-        return 'BETTING';
+        this.runState = 'TABLE_START_LOCK';
+        return 'TABLE_START_LOCK';
       }
 
       case 'shop': {
@@ -321,14 +323,17 @@ export class RogueRun {
       }
 
       case 'mystery': {
-        // Random event: 25% +$50, 25% -$30, 25% free upgrade, 25% crack a die
+        // Random event: 25% +$X, 25% -$Y, 25% free upgrade, 25% crack a die
+        // Amounts scale by act: Act 1 ±$20, Act 2 ±$40, Act 3 ±$60
+        const actScale = [4, 8, 12][this.currentActIndex] || 4;
+        const graceAmount = Math.max(2, actScale - 2);
         const roll = Math.random();
         if (roll < 0.25) {
-          this.game.money += 50;
-          this.game.message = 'Mystery: found $50!';
+          this.game.money += actScale;
+          this.game.message = `Mystery: found ₡${actScale}!`;
         } else if (roll < 0.50) {
-          this.game.money = Math.max(0, this.game.money - 30);
-          this.game.message = 'Mystery: lost $30...';
+          this.game.money = Math.max(0, this.game.money - graceAmount);
+          this.game.message = `Mystery: lost ₡${graceAmount}...`;
         } else if (roll < 0.75 && this.activeUpgrades.size < UPGRADES.length) {
           // Apply a free random upgrade from the available pool
           const pool = getAvailableUpgrades(new Set(this.activeUpgrades.keys()));
@@ -356,16 +361,32 @@ export class RogueRun {
             this.game.message = 'Mystery: nothing happened...';
           }
         }
+        this.runState = 'MAP_NAV';
         return 'MAP_NAV';
       }
 
       case 'rest': {
-        // Restore 2 durability to all dice in hand, +$25
-        this.diceHand.slots.forEach(slot => {
-          if (slot) slot.durability = Math.min(12, slot.durability + 2);
+        // Restore +1 durability to 2 random non-cracked dice, +$25
+        const aliveIndices = [];
+        this.diceHand.slots.forEach((slot, i) => {
+          if (slot && slot.durability > 0 && slot.durability < 12) aliveIndices.push(i);
         });
-        this.game.money += 25;
-        this.game.message = 'Rest: dice repaired + $25 bonus';
+        if (aliveIndices.length > 0) {
+          // Shuffle and pick up to 2
+          for (let i = aliveIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [aliveIndices[i], aliveIndices[j]] = [aliveIndices[j], aliveIndices[i]];
+          }
+          const count = Math.min(2, aliveIndices.length);
+          for (let i = 0; i < count; i++) {
+            this.diceHand.slots[aliveIndices[i]].durability = Math.min(12, this.diceHand.slots[aliveIndices[i]].durability + 1);
+          }
+          this.game.message = `Rest: +1 dur to ${count} die(s) + ₡5 bonus`;
+        } else {
+          this.game.message = 'Rest: ₡5 bonus (all dice fresh/cracked)';
+        }
+        this.game.money += 5;
+        this.runState = 'MAP_NAV';
         return 'MAP_NAV';
       }
 
@@ -375,14 +396,33 @@ export class RogueRun {
   }
 
   /**
-   * Start a roll — transitions state from BETTING/DICE_PICK to DICE_PICK.
-   * The actual physics roll is delegated to the Game instance.
+   * Start a roll — transitions state from BETTING to ROLLING.
+   * Auto-picks locked dice before delegating to the Game instance.
    * @returns {boolean} true if roll was initiated
    */
   roll() {
-    if (this.runState !== 'BETTING' && this.runState !== 'DICE_PICK') return false;
+    if (this.runState !== 'BETTING') return false;
+    // Auto-pick locked dice before rolling
+    this.diceHand.autoPickLocked();
     if (!this.game.roll()) return false;
-    this.runState = 'DICE_PICK';
+    this.runState = 'ROLLING';
+    return true;
+  }
+
+  /**
+   * Lock 2 dice slots for the entire table duration.
+   * Called from the TABLE_START_LOCK overlay on confirm.
+   * @param {number[]} slotIndices — exactly 2 slot indices to lock
+   * @returns {boolean} true if dice were locked successfully
+   */
+  lockTableDice(slotIndices) {
+    if (this.runState !== 'TABLE_START_LOCK') return false;
+    if (!slotIndices || slotIndices.length !== 2) return false;
+
+    const success = this.diceHand.lockSlotsForTable(slotIndices);
+    if (!success) return false;
+
+    this.runState = 'BETTING';
     return true;
   }
 
@@ -392,18 +432,7 @@ export class RogueRun {
    * @returns {boolean} true if dice were successfully picked
    */
   confirmDicePick(slotIndices) {
-    if (this.runState !== 'DICE_PICK') return false;
-    if (!slotIndices || slotIndices.length !== 2) return false;
-
-    // Reset previous picks
-    this.diceHand.slots.forEach(s => s.picked = false);
-
-    for (const idx of slotIndices) {
-      if (!this.diceHand.pickSlot(idx)) return false;
-    }
-
-    this.runState = 'ROLLING';
-    return true;
+    return false; // deprecated: dice are now locked per-table, not per-roll
   }
 
   /**
@@ -440,6 +469,9 @@ export class RogueRun {
     const previousPhase = this.game.phase;
     const previousPoint = this.game.point;
 
+    // Auto-pick locked dice (they persist across hands within a table)
+    this.diceHand.autoPickLocked();
+
     // ─── HOT DICE: force auto-win on come-out ──────────
     if (this._hotDiceReady && previousPhase === 'COME_OUT') {
       // Override: treat as natural win
@@ -465,7 +497,6 @@ export class RogueRun {
     const _synergyState = getActiveSynergies(this.activeUpgrades);
 
     const _antiFlag = {
-      precisionReroll: false,   // loaded_dice upgrade + precision die → removed
       doubleDownNerf: false,    // double_down + loan_shark → -10% payout
       insuranceVolatile: false, // insurance + volatile die → refund -1
       noStreakOnLoss: false,    // compound_streak + all_weather → streak frozen on loss
@@ -488,132 +519,180 @@ export class RogueRun {
     const isPurist = this.vow && this.vow.effect === 'no_dice_effects';
 
     // Dice-type anti-synergies — checked against picked dice (not in activeUpgrades)
-    if (this.activeUpgrades.has('loaded_dice') && pickedDice.some(d => d.id === 'precision'))
-      _antiFlag.precisionReroll = true;
     if (this.activeUpgrades.has('insurance') && pickedDice.some(d => d.id === 'volatile'))
       _antiFlag.insuranceVolatile = true;
 
-    // Reset Seven Die per-hand tracker on new come-out roll
+    // Reset per-hand tracker on new come-out roll
     if (previousPhase === 'COME_OUT') {
-    this._sevenDieUsedThisHand = false;
     this._synergyRerolls = 0;
-    this._synergies = null;
+      this._synergies = null;
     }
 
+    // ---- CRACKED PENALTY (house_bones immune) ----
     for (const die of pickedDice) {
-      // Cracked dice: no special effect, 20% lose $2
-      if (die.durability === 0) {
-        if (Math.random() < 0.20) {
-          this.game.money = Math.max(this.game.money - 2, this.bustThreshold);
-          this.game.message += ' (cracked! -$2)';
+      if (isCracked(die) && die.id !== 'house_bones') {
+        if (Math.random() < crackedEffect.loseChance) {
+          this.game.money = Math.max(0, this.game.money - crackedEffect.loseAmount);
+          this.game.message += ' (cracked -₡1)';
         }
-        continue;
       }
+    }
+
+    // ---- DICE TYPE EFFECTS ----
+    for (const die of pickedDice) {
+      // Cracked dice have no special effect (except House Bones immunity to penalty)
+      if (isCracked(die)) continue;
 
       // Purist: skip all type-specific effects
       if (isPurist) continue;
 
       switch (die.id) {
-        case 'weighted':
-          if (previousPhase === 'COME_OUT' && diceResult !== 'win' && Math.random() < 0.25) {
-            diceSum = 7;
-            diceResult = this._resolveDiceSum(7, previousPhase, previousPoint, diceResult);
-            this.game.message = 'weighted! sum\u21927';
+        // SAFE
+        case 'house_bones':
+          // Passive: immune to cracked money penalty (handled in cracked check above)
+          // No active effect needed here
+          break;
+
+        case 'witness':
+          // Reveal predicted top face before settle
+          this._witnessPrediction = values[0] + values[1];
+          if (!this.game.message.includes('Witness')) {
+            this.game.message = `Witness foresees ~${this._witnessPrediction}...`;
           }
           break;
-        case 'volatile':
-          if (diceResult === 'win') {
-            const bonus = Math.floor(this.game.bet * 0.5);
-            this.game.money += bonus;
-            this.game.message += ` (volatile +$${bonus})`;
-          } else if (diceResult === 'loss') {
-            const penalty = Math.floor(this.game.bet * 0.25);
-            this.game.money = Math.max(this.game.money - penalty, this.bustThreshold);
-            this.game.message += ` (volatile -$${penalty})`;
-          }
-          break;
-        case 'seven_die':
-          if (!this._sevenDieUsedThisHand && diceSum === 6) {
-            diceSum = 7;
-            diceResult = this._resolveDiceSum(7, previousPhase, previousPoint, diceResult);
-            this._sevenDieUsedThisHand = true;
-            this.game.message += ' (seven die! 6\u21927)';
-          }
-          break;
+
+        // CALCULATED RISK
         case 'glass':
           if (diceResult === 'win') {
-            const bonus = Math.floor(this.game.bet * 0.5);
-            this.game.money += bonus;
-            this.game.message += ` (glass +$${bonus})`;
+            const glassBonus = Math.floor(this.game.bet * 0.5);
+            this.game.money += glassBonus;
+            this.game.message += ` (glass +₡${glassBonus})`;
           } else if (diceResult === 'loss') {
-            const slot = this.diceHand.slots.find(s => s.picked && s.typeId === 'glass');
-            if (slot) slot.durability = 0;
+            // Shatters: set durability to 0
+            const glassSlot = this.diceHand.slots.find(s => s.typeId === 'glass' && s.picked);
+            if (glassSlot) glassSlot.durability = 0;
             this.game.message += ' (glass shattered!)';
           }
           break;
-        case 'precision':
-          if (!_antiFlag.precisionReroll && (diceSum === 2 || diceSum === 12)) {
-            const newSum = Math.floor(Math.random() * 11) + 2;
-            diceSum = newSum;
-            diceResult = this._resolveDiceSum(newSum, previousPhase, previousPoint, diceResult);
-            this.game.message += ` (precision \u2192 ${newSum})`;
-          }
-          break;
-        case 'lucky_11':
-          // 20% chance pays at 3:2 odds (1.5x multiplier instead of 1x)
-          if (diceResult === 'win' && Math.random() < 0.20) {
-            const bonus = Math.floor(this.game.bet * 0.5);
-            this.game.money += bonus;
-            this.game.message += ` (lucky 11: +$${bonus})`;
-          }
-          break;
-        case 'cursed_13':
-          // Win: -$5, Loss: +$3
+
+        case 'volatile':
           if (diceResult === 'win') {
-            this.game.money = Math.max(this.game.money - 5, this.bustThreshold);
-            this.game.message += ' (cursed 13: -$5)';
+            const volBonus = Math.floor(this.game.bet * 0.5);
+            this.game.money += volBonus;
+            this.game.message += ` (volatile +₡${volBonus})`;
           } else if (diceResult === 'loss') {
-            this.game.money += 3;
-            this.game.message += ' (cursed 13: +$3)';
+            const volPenalty = Math.floor(this.game.bet * 0.25);
+            this.game.money = Math.max(0, this.game.money - volPenalty);
+            this.game.message += ` (volatile -₡${volPenalty})`;
           }
           break;
-        case 'mirror':
-          // Copies the other picked die's effect at 50% strength
-          if (pickedDice.length === 2) {
-            const otherDie = pickedDice.find(d => d.id !== 'mirror' && d.durability > 0);
-            if (otherDie && diceResult === 'win') {
-              const bonus = Math.floor(this.game.bet * 0.25);
-              this.game.money += bonus;
-              this.game.message += ` (mirror: +$${bonus})`;
-            }
+
+        case 'cursed_13':
+          if (diceResult === 'win') {
+            this.game.money = Math.max(0, this.game.money - 1);
+            this.game.message += ' (cursed -₡1)';
+          } else if (diceResult === 'loss') {
+            this.game.money += 1;
+            this.game.message += ' (cursed +₡1)';
           }
           break;
+
+        case 'loaded_set':
+          // Paired: handled by post-loop check below — no single-die effect
+          break;
+
+        // GAMBLING
         case 'snake_eyes':
-          // Sum=2 auto-wins on come-out (where 2 is normally a craps loss)
-          if (diceSum === 2 && diceResult !== 'win' && previousPhase === 'COME_OUT') {
+          if (diceSum === 2) {
+            // Auto-win on ANY phase (not just come-out)
             if (diceResult === 'loss') this.game.lossCount--;
             this.game.money += this.game.bet * 2;
             this.game.winCount++;
             this.game.phase = 'COME_OUT';
             this.game.point = null;
             diceResult = 'win';
-            diceSum = 2;
-            this.game.message += ' (snake eyes wins!)';
+            this.game.message = 'Snake Eyes! instant win!';
           }
           break;
-        case 'hustler':
-          // 3 wins with this die = free upgrade pick
-          if (diceResult === 'win') {
-            const slotIdx = this.diceHand.slots.findIndex(s => s.picked && s.typeId === 'hustler');
-            if (slotIdx >= 0) {
-              this._hustlerWins[slotIdx] = (this._hustlerWins[slotIdx] || 0) + 1;
-              if (this._hustlerWins[slotIdx] >= 3) {
-                this._hustlerFreePick = true;
-                this._hustlerWins[slotIdx] = 0;
-                this.game.message += ' (hustler pays off!)';
-              } else {
-                this.game.message += ` (hustler: ${this._hustlerWins[slotIdx]}/3)`;
+
+        case 'doom':
+          {
+            const d20 = Math.floor(Math.random() * 20) + 1;
+            if (d20 === 1) {
+              // Bust: money = 0
+              this.game.money = 0;
+              diceResult = 'loss';
+              this.game.message = 'DOOM: d20 = 1 — BUST!';
+            } else if (d20 === 20) {
+              // Instant table clear
+              if (this.currentNode && this.currentNode.target) {
+                this.game.money = this.currentNode.target;
               }
+              this.game.message = 'DOOM: d20 = 20 — TABLE CLEAR!';
+            } else if (d20 >= 2 && d20 <= 10) {
+              diceSum = Math.max(2, diceSum - d20);
+              diceResult = this._resolveDiceSum(diceSum, previousPhase, previousPoint, diceResult);
+              this.game.message = `Doom d20: ${d20} — sum reduced to ${diceSum}`;
+            } else {
+              diceSum = Math.min(12, diceSum + (d20 - 10));
+              diceResult = this._resolveDiceSum(diceSum, previousPhase, previousPoint, diceResult);
+              this.game.message = `Doom d20: ${d20} — sum boosted to ${diceSum}`;
+            }
+          }
+          break;
+
+        // BUILD-AROUND
+        case 'debt':
+          // Accumulate debt each roll
+          if (!this._debtCounter) this._debtCounter = 0;
+          this._debtCounter += 1;
+          this.game.money = Math.max(0, this.game.money - 1);
+          this.game.message += ` (debt -₡1, owe ₡${this._debtCounter})`;
+          break;
+
+        case 'vengeance':
+          // +1 per cracked die in hand
+          {
+            const crackedCount = this.diceHand.slots.filter(s => s.durability <= 0).length;
+            if (crackedCount > 0) {
+              diceSum += crackedCount;
+              diceResult = this._resolveDiceSum(diceSum, previousPhase, previousPoint, diceResult);
+              this.game.message += ` (vengeance +${crackedCount})`;
+            }
+          }
+          break;
+
+        case 'pyre':
+          {
+            const pyreRoll = Math.random();
+            if (pyreRoll < 0.05) {
+              // 5% instant table clear
+              if (this.currentNode && this.currentNode.target) {
+                this.game.money = this.currentNode.target;
+              }
+              diceResult = 'win';
+              this.game.message = 'PYRE: table cleared in flames!';
+            } else {
+              this.game.money = Math.max(0, this.game.money - 2);
+              this.game.message += ' (pyre -₡2)';
+            }
+          }
+          break;
+
+        case 'split':
+          // Treat each die value as a separate bet
+          {
+            const [d1, d2] = values;
+            let splitPayout = 0;
+            // Die 1: d1 is the "sum" for a 1-die roll
+            if (d1 === 7 || d1 === 11) splitPayout += this.game.bet;
+            else if (d1 === 2 || d1 === 3 || d1 === 12) splitPayout -= this.game.bet;
+            // Die 2: same
+            if (d2 === 7 || d2 === 11) splitPayout += this.game.bet;
+            else if (d2 === 2 || d2 === 3 || d2 === 12) splitPayout -= this.game.bet;
+            if (splitPayout !== 0) {
+              this.game.money += splitPayout;
+              this.game.message += ` (split ${splitPayout > 0 ? '+' : ''}₡${splitPayout})`;
             }
           }
           break;
@@ -623,7 +702,7 @@ export class RogueRun {
     // ─── LOADED SET PAIR: both dice loaded_set → +2 sum (clamped to 6 per face) ──
     // Purist vow: no dice type effects, skip pair bonus
     if (pickedDice.length === 2 && !isPurist) {
-      const bothLoadedSet = pickedDice.every(d => d.id === 'loaded_set' && d.durability > 0);
+      const bothLoadedSet = pickedDice.every(d => d.id === 'loaded_set' && !isCracked(d));
       if (bothLoadedSet) {
         const v1 = Math.min(values[0] + 1, 6);
         const v2 = Math.min(values[1] + 1, 6);
@@ -702,7 +781,7 @@ export class RogueRun {
     if (finalResult === 'win' && hasCharges('lucky_coin')) {
       const doubled = this.game.money;
       this.game.money += doubled;
-      this.game.message += ` (lucky coin! +$${doubled})`;
+      this.game.message += ` (lucky coin! +₡${doubled})`;
       consume('lucky_coin');
     }
 
@@ -765,14 +844,14 @@ export class RogueRun {
 
     // Lucky 7s: rolling 7 on come-out pays +$2
     if (finalResult === 'win' && sum === 7 && previousPhase === 'COME_OUT' && has('lucky_7s')) {
-      this.game.money += 2;
+      this.game.money += 1;
     }
 
     // Magnetic Point: point wins pay +50%
     if (finalResult === 'win' && previousPhase === 'POINT' && has('magnetic_point')) {
       const bonus = Math.floor(this.game.bet * 0.5);
       this.game.money += bonus;
-      this.game.message += ` (magnetic: +$${bonus})`;
+      this.game.message += ` (magnetic: +₡${bonus})`;
     }
 
     // Hot Dice: set ready flag when point is made
@@ -797,8 +876,8 @@ export class RogueRun {
 
     // Face-Off: doubles (both dice same face) pay +$10 bonus
     if (finalResult === 'win' && values[0] === values[1] && has('face_off')) {
-      this.game.money += 10;
-      this.game.message += ' (face-off +$10)';
+      this.game.money += 2;
+      this.game.message += ' (face-off +₡2)';
     }
 
     // ========== BET MOD HOOKS ===========================
@@ -813,12 +892,12 @@ export class RogueRun {
 
     // Pocket Change: each win pays +$2 extra
     if (finalResult === 'win' && has('pocket_change')) {
-      this.game.money += 2;
+      this.game.money += 1;
     }
 
     // Lucky 11: natural 11 on come-out pays +$3
     if (finalResult === 'win' && sum === 11 && previousPhase === 'COME_OUT' && has('lucky_11')) {
-      this.game.money += 3;
+      this.game.money += 1;
     }
 
     // Cascade: on point win, get bet back
@@ -841,13 +920,13 @@ export class RogueRun {
       let refund = Math.floor(this.game.bet / 2);
       if (_antiFlag.insuranceVolatile) refund = Math.max(0, refund - 1);
       this.game.money += refund;
-      this.game.message += ` (insurance: -$${refund})`;
+      this.game.message += ` (insurance: -₡${refund})`;
     }
     if (result === 'loss' && previousPhase === 'COME_OUT' && has('insurance') && (sum === 2 || sum === 12) && !has('snake_charmer')) {
       let refund = Math.floor(this.game.bet / 2);
       if (_antiFlag.insuranceVolatile) refund = Math.max(0, refund - 1);
       this.game.money += refund;
-      this.game.message += ` (insurance: -$${refund})`;
+      this.game.message += ` (insurance: -₡${refund})`;
     }
 
     // Sucker Bet: 15% chance loss → push
@@ -888,7 +967,7 @@ export class RogueRun {
         this.game.message += ' (parlay doubled!)';
       } else if (finalResult === 'loss') {
         this.game.money = Math.max(this.game.money - this.game.bet, this.bustThreshold);
-        this.game.message += ` (parlay -$${this.game.bet})`;
+        this.game.message += ` (parlay -₡${this.game.bet})`;
       }
     }
 
@@ -908,8 +987,8 @@ export class RogueRun {
     if (has('iron_bank')) {
       this._ironBankCounter++;
       if (this._ironBankCounter % 3 === 0) {
-        this.game.money += 5;
-        this.game.message += ' (iron bank +$5)';
+        this.game.money += 1;
+        this.game.message += ' (iron bank +₡1)';
       }
     }
 
@@ -918,7 +997,7 @@ export class RogueRun {
     const _finalSynergy = getActiveSynergies(this.activeUpgrades);
     this._synergies = _finalSynergy;
 
-    // dice 2-set: +1 free re-roll per hand (accumulated for next DICE_PICK)
+    // dice 2-set: +1 free re-roll per hand
     if (_finalSynergy.synergies.some(s => s.category === 'dice' && s.tier === 'set2')) {
       this._synergyRerolls++;
     }
@@ -938,7 +1017,7 @@ export class RogueRun {
     if (finalResult === 'win' && _finalSynergy.synergies.some(s => s.category === 'bet' && s.tier === 'set2')) {
       const bonus = Math.floor(this.game.bet * 0.15);
       this.game.money += bonus;
-      this.game.message += ` (synergy: +$${bonus})`;
+      this.game.message += ` (synergy: +₡${bonus})`;
     }
 
     // bet 3-set: 1% interest per hand
@@ -946,7 +1025,7 @@ export class RogueRun {
       const interest = Math.floor(this.game.money * 0.01);
       if (interest > 0) {
         this.game.money += interest;
-        this.game.message += ` (synergy: interest +$${interest})`;
+        this.game.message += ` (synergy: interest +₡${interest})`;
       }
     }
 
@@ -974,7 +1053,7 @@ export class RogueRun {
 
     // talent 2-set: +$2 passive income per roll
     if (_finalSynergy.synergies.some(s => s.category === 'talent' && s.tier === 'set2')) {
-      this.game.money += 2;
+      this.game.money += 1;
     }
 
     // talent 3-set: double all passive income
@@ -985,11 +1064,11 @@ export class RogueRun {
       }
       // Iron Bank: if triggered this hand, add another $5
       if (has('iron_bank') && this._ironBankCounter > 0 && this._ironBankCounter % 3 === 0) {
-        this.game.money += 5;
+        this.game.money += 1;
       }
       // talent 2-set synergy: already added $2, double it → add another $2
       if (_finalSynergy.synergies.some(s => s.category === 'talent' && s.tier === 'set2')) {
-        this.game.money += 2;
+        this.game.money += 1;
       }
     }
 
@@ -1136,10 +1215,9 @@ export class RogueRun {
         const c = escapeCharges;
         if (c === 1) this.activeUpgrades.delete('escape_plan');
         else if (c > 1) this.activeUpgrades.set('escape_plan', c - 1);
-        this.game.money = 5;
-        this.diceHand.slots.forEach(s => s.picked = false);
-        this.runState = 'DICE_PICK';
-        this.game.message = 'escape plan! survived with $5';
+        this.game.money = 1;
+        this.runState = 'BETTING';
+        this.game.message = 'escape plan! survived with ₡1';
       } else {
         this.pendingShops = [];
         this.currentShopNpc = null;
@@ -1147,32 +1225,15 @@ export class RogueRun {
       }
     } else if (this.currentNode && (this.currentNode.type === 'table' || this.currentNode.type === 'boss') && this.game.money >= this.currentNode.target && this.game.phase === 'COME_OUT' && this.handCount > 0) {
       // Node cleared!
-      if (this.currentNode.type === 'boss') {
-        const actComplete = isActComplete(MAP_ACTS, this.currentActIndex);
-        if (this.currentActIndex >= MAP_ACTS.length - 1 && actComplete) {
-          // Final boss cleared → run won!
-          if (this.activeUpgrades.has('side_pot') && this.sidePot > 0) {
-            this.bonusPot = this.sidePot * 2;
-            this.game.money += this.bonusPot;
-          }
-          this.pendingShops = [];
-          this.currentShopNpc = null;
-          this.runState = 'RUN_WON';
-        } else {
-          // Advance to next floor/act after boss
-          const next = getNextFloors(MAP_ACTS, this.currentActIndex, this.currentFloorIndex);
-          if (next) {
-            this.currentActIndex = next.actIndex;
-            this.currentFloorIndex = next.floorIndex;
-          }
-          this.runState = 'MAP_NAV';
-        }
-      } else {
-        // Table cleared → back to map navigation
-        this.runState = 'MAP_NAV';
-      }
       // Reset per-node hand counter (speed_run tracking)
       this._tableHandCount = 0;
+      // Pay off Debt dice
+      if (this._debtCounter > 0) {
+        const debtPayoff = 5;
+        this.game.money += debtPayoff;
+        this.game.message += ` (debt paid +₡${debtPayoff})`;
+        this._debtCounter = 0;
+      }
       // Purist vow: +1 free upgrade per node clear
       if (this.vow && this.vow.effect === 'no_dice_effects') {
         const puristPool = getAvailableUpgrades(new Set(this.activeUpgrades.keys()));
@@ -1190,82 +1251,76 @@ export class RogueRun {
       if (this.activeUpgrades.has('hustlers_cut')) {
         const cut = Math.floor(this.currentNode.target * 0.05);
         this.game.money += cut;
-        this.game.message += ` (hustler's cut +$${cut})`;
+        this.game.message += ` (hustler's cut +₡${cut})`;
       }
       this.pendingShops = [];
+
+      if (this.currentNode.type === 'boss') {
+        const actComplete = isActComplete(MAP_ACTS, this.currentActIndex);
+        if (this.currentActIndex >= MAP_ACTS.length - 1 && actComplete) {
+          // Final boss cleared → run won!
+          if (this.activeUpgrades.has('side_pot') && this.sidePot > 0) {
+            this.bonusPot = this.sidePot * 2;
+            this.game.money += this.bonusPot;
+          }
+          this.currentShopNpc = null;
+          this.diceHand.lockedSlots.clear();
+          this.runState = 'RUN_WON';
+        } else {
+          // Advance to next floor/act after boss
+          const next = getNextFloors(MAP_ACTS, this.currentActIndex, this.currentFloorIndex);
+          if (next) {
+            this.currentActIndex = next.actIndex;
+            this.currentFloorIndex = next.floorIndex;
+          }
+          // Award 2 upgrade picks on boss clear
+          const clearPool = getAvailableUpgrades(new Set(this.activeUpgrades.keys()));
+          if (clearPool.length > 0) {
+            this._pendingTableClearPicks = 2;
+            this.runState = 'PICKING';
+            this._pickShown = false;
+            this.game.message = 'Boss cleared! Pick 2 upgrades!';
+            return finalResult;
+          }
+          this._mapNavBlockedUntil = Date.now() + RESULT_CARD_DELAY + RESULT_CARD_DISPLAY + 200;
+          this.diceHand.lockedSlots.clear();
+          this.runState = 'MAP_NAV';
+        }
+      } else {
+        // Award 1 upgrade pick on table clear
+        const clearPool = getAvailableUpgrades(new Set(this.activeUpgrades.keys()));
+        if (clearPool.length > 0) {
+          this._pendingTableClearPicks = 1;
+          this.runState = 'PICKING';
+          this._pickShown = false;
+          this.game.message = 'Table cleared! Pick 1 upgrade!';
+          return finalResult;
+        }
+        this._mapNavBlockedUntil = Date.now() + RESULT_CARD_DELAY + RESULT_CARD_DISPLAY + 200;
+        this.diceHand.lockedSlots.clear();
+        this.runState = 'MAP_NAV';
+      }
     } else if (
       this.game.phase === 'COME_OUT' &&
       finalResult === 'win' &&
       this.handCount > 0
     ) {
-      const remaining = getAvailableUpgrades(new Set(this.activeUpgrades.keys()));
-      if (remaining.length === 0) {
-        this.diceHand.slots.forEach(s => s.picked = false);
-        this.runState = 'DICE_PICK';
-      } else {
-        this.runState = 'PICKING';
-        this._pickShown = false;
-      }
+      this.game.message = 'nice win! keep rolling...';
+      this.runState = 'BETTING';
     } else if (
       finalResult === 'point' &&
       this.handCount > 0
     ) {
-      // Point-established also grants a pick (raises pick rate from ~49% to ~70% of hands)
-      const remaining = getAvailableUpgrades(new Set(this.activeUpgrades.keys()));
-      if (remaining.length === 0) {
-        this.diceHand.slots.forEach(s => s.picked = false);
-        this.runState = 'DICE_PICK';
-      } else {
-        this.runState = 'PICKING';
-        this._pickShown = false;
-        this.game.message = 'point established — pick an upgrade';
-      }
+      this.game.message = 'point established — roll to hit it';
+      this.runState = 'BETTING';
     } else if (
       this.game.phase === 'COME_OUT' &&
       (finalResult === 'loss' || finalResult === 'push') &&
       this.handCount > 0
     ) {
-      this.game.message = 'no upgrade — wins & points grant picks';
-      this.diceHand.slots.forEach(s => s.picked = false);
-      this.runState = 'DICE_PICK';
+      this.runState = 'BETTING';
     } else {
-      this.diceHand.slots.forEach(s => s.picked = false);
-      this.runState = 'DICE_PICK';
-    }
-
-    // ========== STATE TRANSITIONS ======================
-
-    // Hustler free pick: 3 wins with Hustler die triggers PICKING
-    if (this._hustlerFreePick &&
-        this.runState !== 'BUST' &&
-        this.runState !== 'RUN_WON' &&
-        this.runState !== 'MAP_NAV' &&
-        this.runState !== 'PICKING') {
-      const remaining = getAvailableUpgrades(new Set(this.activeUpgrades.keys()));
-      if (remaining.length > 0) {
-        this.runState = 'PICKING';
-        this._pickShown = false;
-        this._hustlerFreePick = false;
-        this.game.message = 'Hustler pays off — pick an upgrade!';
-      } else {
-        this._hustlerFreePick = false;
-      }
-    }
-
-    // Shop frequency: trigger a shop visit between hands (every 2–3 hands)
-    // Only fires when runState settled to DICE_PICK (hand-complete).
-    // Skips PICKING, MAP_NAV, BUST, RUN_WON, and SHOPPING states.
-    // Iron Man vow: shops are completely locked — skip shop population.
-    this._handsSinceShop++;
-
-    if (this.runState === 'DICE_PICK' && !(this.vow && this.vow.effect === 'no_shops')) {
-      const shopThreshold = 2 + Math.floor(Math.random() * 2); // 2–3 hands
-      if (this._handsSinceShop >= shopThreshold && NPC_DEFS.length > 0) {
-        const randomNpc = NPC_DEFS[Math.floor(Math.random() * NPC_DEFS.length)];
-        this.pendingShops = [randomNpc.id];
-        this._handsSinceShop = 0;
-        this.advanceShop(); // overrides runState to SHOPPING
-      }
+      this.runState = 'BETTING';
     }
 
     return finalResult;
@@ -1348,8 +1403,24 @@ export class RogueRun {
 
     // Collector: +$10 whenever you add an upgrade (not self-triggering)
     if (id !== 'collector' && this.activeUpgrades.has('collector')) {
-      this.game.money += 10;
-      this.game.message += ` (collector +$10)`;
+      this.game.money += 2;
+      this.game.message += ` (collector +₡2)`;
+    }
+
+    // Handle table-clear pick queue
+    if (this._pendingTableClearPicks > 0) {
+      this._pendingTableClearPicks--;
+      if (this._pendingTableClearPicks <= 0) {
+        // All table clear picks done — continue to map
+        this.diceHand.lockedSlots.clear();
+        this._mapNavBlockedUntil = Date.now() + RESULT_CARD_DELAY + RESULT_CARD_DISPLAY + 200;
+        this.runState = 'MAP_NAV';
+        return;
+      }
+      // More picks remaining — refresh PICKING overlay
+      this._pickShown = false;
+      this.runState = 'PICKING';
+      return;
     }
 
     this.runState = 'BETTING';

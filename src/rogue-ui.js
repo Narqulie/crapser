@@ -56,23 +56,6 @@ export class RogueUI {
     this.metaEl = document.getElementById('meta-display');
     this.rerollEl = document.getElementById('reroll-display');
 
-    // Table clear overlay
-    // Table clear overlay removed — map navigation replaces it.
-    if (document.getElementById('table-clear-btn')) {
-      document.getElementById('table-clear-btn').addEventListener('click', () => {
-        // Start shop sequence
-        const next = this.rogueRun.advanceShop ? this.rogueRun.advanceShop() : null;
-        if (next) {
-          this.showShop(next);
-        } else {
-          // No shops — go to betting
-          this.rogueRun.runState = 'BETTING';
-          this.ui.sync();
-          this.sync();
-          if (this.onShopDone) this.onShopDone();
-        }
-      });
-    }
 
     // Perk overlay
     this.perkOverlay = document.getElementById('perk-overlay');
@@ -112,6 +95,8 @@ export class RogueUI {
     this.dicePickSlots = document.getElementById('dice-pick-slots');
     this.dicePickConfirm = document.getElementById('dice-pick-confirm');
     this._pickedSlots = [];
+    this._tableLockMode = false;
+    this.onTableLockDone = null;
 
     // Map navigation overlay
     this.mapOverlay = document.getElementById('map-overlay');
@@ -138,13 +123,27 @@ export class RogueUI {
 
     if (this.dicePickConfirm) {
       this.dicePickConfirm.addEventListener('click', () => {
-        if (this._pickedSlots.length !== 2) return;
-        const slotA = this._pickedSlots[0];
-        const slotB = this._pickedSlots[1];
-        const success = this.rogueRun.confirmDicePick([slotA, slotB]);
-        if (success) {
-          this.hideDicePick();
-          if (this.onDicePickConfirmed) this.onDicePickConfirmed();
+        if (this._tableLockMode) {
+          // Table lock mode: confirm locks 2 dice for the table
+          if (this._pickedSlots.length !== 2) return;
+          const slotA = this._pickedSlots[0];
+          const slotB = this._pickedSlots[1];
+          const success = this.rogueRun.lockTableDice([slotA, slotB]);
+          if (success) {
+            this._tableLockMode = false;
+            this.hideTableStartLock();
+            this.onTableLockDone();
+          }
+        } else {
+          // Normal dice pick mode
+          if (this._pickedSlots.length !== 2) return;
+          const slotA = this._pickedSlots[0];
+          const slotB = this._pickedSlots[1];
+          const success = this.rogueRun.confirmDicePick([slotA, slotB]);
+          if (success) {
+            this.hideDicePick();
+            if (this.onDicePickConfirmed) this.onDicePickConfirmed();
+          }
         }
       });
     }
@@ -263,7 +262,7 @@ export class RogueUI {
         ? `<span class="map-node-trait">${node.trait}</span>`
         : '';
       const targetHTML = (node.type === 'table' || node.type === 'boss') && node.target
-        ? `<span class="map-node-target">Target: $${node.target}</span>`
+        ? `<span class="map-node-target">Target: ₡${node.target}</span>`
         : '';
       const npcHTML = node.npc
         ? `<span class="map-node-npc">${node.type === 'shop' ? node.npc : 'vs ' + node.npc}</span>`
@@ -387,7 +386,7 @@ export class RogueUI {
 
     // Money
     if (this.shopMoney) {
-      this.shopMoney.textContent = `Money: $${this.rogueRun.game.money}`;
+      this.shopMoney.textContent = `Money: ₡${this.rogueRun.game.money}`;
     }
 
     // Items
@@ -405,7 +404,7 @@ export class RogueUI {
             ${item.stubbed ? `<div class="shop-item-stubbed">${item.descStubbed}</div>` : ''}
           </div>
           <div class="shop-item-cost">
-            <div class="shop-cost-amount">$${cost}</div>
+            <div class="shop-cost-amount">₡${cost}</div>
             <div class="shop-cost-label">${item.rarity}</div>
           </div>
           <button class="shop-buy-btn ${buyClass}" ${!canBuy || item.stubbed ? 'disabled' : ''}>
@@ -466,7 +465,7 @@ export class RogueUI {
 
     // Update money display
     if (this.shopMoney) {
-      this.shopMoney.textContent = `Money: $${result.moneyAfter}`;
+      this.shopMoney.textContent = `Money: ₡${result.moneyAfter}`;
     }
 
     // Fizzle message for used_charm
@@ -496,7 +495,7 @@ export class RogueUI {
       });
 
       if (this.shopMoney) {
-        this.shopMoney.textContent = `Money: $${money}`;
+        this.shopMoney.textContent = `Money: ₡${money}`;
       }
     }, 600);
   }
@@ -570,6 +569,96 @@ export class RogueUI {
       this.dicePickOverlay.classList.remove('visible');
     }
     this._pickedSlots = [];
+  }
+
+  /**
+   * Show overlay to pick 2 dice to lock for the entire table.
+   * Reuses the dice-pick overlay DOM. Locked dice are used for every
+   * roll during this table and can't be swapped out.
+   */
+  showTableStartLock() {
+    if (!this.dicePickOverlay || !this.dicePickSlots) return;
+
+    const slots = this.rogueRun.diceHandSlots;
+    this._pickedSlots = [];
+    this._tableLockMode = true;
+
+    // Update header text
+    const header = this.dicePickOverlay.querySelector('.pick-header');
+    if (header) header.textContent = 'Lock 2 Dice for This Table';
+
+    this.dicePickSlots.innerHTML = slots.map((s, i) => {
+      const def = s.type;
+      const cracked = s.durability === 0;
+      const maxDur = def ? def.durability : 1;
+      const pct = cracked ? 0 : Math.min((s.durability / maxDur) * 100, 100);
+      const durabClass = pct >= 60 ? 'high' : pct >= 30 ? 'medium' : 'low';
+      const delay = i * 0.08;
+
+      return `<div class="dice-slot ${cracked ? 'cracked' : ''}" data-index="${i}" style="--enter-delay: ${delay}s">
+        ${cracked ? '<span class="cracked-indicator">⚠ cracked</span>' : ''}
+        <div class="dice-slot-emoji">🎲</div>
+        <div class="dice-slot-type">${def ? def.name : '???'}</div>
+        <div class="dice-slot-durability">
+          <div class="dice-slot-durability-bar">
+            <div class="dice-slot-durability-fill ${durabClass}" style="width:${pct}%"></div>
+          </div>
+          <span class="dice-slot-durability-label">${s.durability}/${maxDur}</span>
+        </div>
+        <div class="dice-slot-effect">${cracked ? 'Cracked — 20% lose ₡1' : (def ? def.effect : '')}</div>
+      </div>`;
+    }).join('');
+
+    // Attach click handlers for pick/unpick (all slots, including cracked)
+    this.dicePickSlots.querySelectorAll('.dice-slot').forEach(card => {
+      card.addEventListener('click', () => {
+        const idx = parseInt(card.dataset.index, 10);
+        if (card.classList.contains('picked')) {
+          // Unpick
+          card.classList.remove('picked');
+          this._pickedSlots = this._pickedSlots.filter(i => i !== idx);
+        } else if (this._pickedSlots.length < 2) {
+          // Pick
+          card.classList.add('picked');
+          this._pickedSlots.push(idx);
+        }
+
+        if (this.dicePickConfirm) {
+          this.dicePickConfirm.disabled = this._pickedSlots.length !== 2;
+        }
+        if (this.dicePickConfirm) {
+          this.dicePickConfirm.textContent = this._pickedSlots.length === 2
+            ? 'Lock These Dice'
+            : `Pick ${2 - this._pickedSlots.length} More`;
+        }
+      });
+    });
+
+    if (this.dicePickConfirm) {
+      this.dicePickConfirm.disabled = true;
+      this.dicePickConfirm.textContent = 'Pick 2 Dice';
+    }
+
+    requestAnimationFrame(() => {
+      this.dicePickOverlay.classList.add('visible');
+    });
+  }
+
+  /** Dismiss table-start lock overlay and reset picked slots */
+  hideTableStartLock() {
+    if (this.dicePickOverlay) {
+      this.dicePickOverlay.classList.remove('visible');
+    }
+    this._pickedSlots = [];
+  }
+
+  /** Default callback after table dice are locked: transition to BETTING state */
+  onTableLockDone() {
+    if (this.rogueRun.runState === 'TABLE_START_LOCK') {
+      this.rogueRun.runState = 'BETTING';
+    }
+    this.ui.sync();
+    this.sync();
   }
 
   // ─── VOW SELECTION OVERLAY ──────────────────────────
@@ -690,13 +779,10 @@ export class RogueUI {
    * from the No Vow skip button).
    */
   _continueNewRun() {
-    const freshBonuses = this.rogueRun.meta ? this.rogueRun.meta.getBonuses() : {};
-    this.rogueRun.resetRun(freshBonuses);
     this.hideGameOver();
     this.hide();
     this.hideShop();
     this.hideVowSelect();
-    this.hideMap();
     this.hideMap();
     this.sync();
     // Also sync the main HUD
@@ -736,7 +822,7 @@ export class RogueUI {
     // Side pot display (keep this, it's unique to rogue-info)
     let sidePotHTML = '';
     if (run.sidePot > 0) {
-      sidePotHTML = `<div class="run-pot">pot: $${run.sidePot}</div>`;
+      sidePotHTML = `<div class="run-pot">pot: ₡${run.sidePot}</div>`;
     }
 
     // Build a compact status line for the run-status area
@@ -785,7 +871,7 @@ export class RogueUI {
       ${summary.upgrades.length > 0
         ? `<p class="run-upgrades-line">${summary.upgrades.join(' \u00b7 ')}</p>`
         : ''}
-      <p class="run-final">finished with $${summary.finalMoney}</p>
+      <p class="run-final">finished with ₡${summary.finalMoney}</p>
       ${this._xpHTML()}
       <button id="new-game-btn">new run</button>
     `;
@@ -811,12 +897,12 @@ export class RogueUI {
         ${summary.tablesCleared > 0 ? `&bull; ${summary.tablesCleared} table${summary.tablesCleared > 1 ? 's' : ''}` : ''}
       </p>
       ${summary.sidePot > 0
-        ? `<p class="run-pot-payout" style="color: #4caf50">side pot x2: +$${summary.bonusPot}</p>`
+        ? `<p class="run-pot-payout" style="color: #4caf50">side pot x2: +₡${summary.bonusPot}</p>`
         : ''}
       ${summary.upgrades.length > 0
         ? `<p class="run-upgrades-line">${summary.upgrades.join(' \u00b7 ')}</p>`
         : ''}
-      <p class="run-final" style="color: #ffd700">final: $${summary.finalMoney}</p>
+      <p class="run-final" style="color: #ffd700">final: ₡${summary.finalMoney}</p>
       ${this._xpHTML()}
       <button id="new-game-btn">new run</button>
     `;

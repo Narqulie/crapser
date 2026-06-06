@@ -25,10 +25,10 @@ import { UPGRADES } from './upgrades.js';
  */
 const TRUST_TABLE = [
   { level: 1, name: 'Stranger', threshold: 0,    discount: 0,    unlocks: ['common', 'uncommon'] },
-  { level: 2, name: 'Regular',  threshold: 100,  discount: 0.10, unlocks: ['common', 'uncommon', 'rare'] },
-  { level: 3, name: 'Friend',   threshold: 500,  discount: 0.15, unlocks: ['common', 'uncommon', 'rare'] },
-  { level: 4, name: 'Partner',  threshold: 1500, discount: 0.20, unlocks: ['common', 'uncommon', 'rare', 'epic'] },
-  { level: 5, name: 'Family',   threshold: 5000, discount: 0.30, unlocks: ['common', 'uncommon', 'rare', 'epic', 'legendary'] },
+  { level: 2, name: 'Regular',  threshold: 20,   discount: 0.10, unlocks: ['common', 'uncommon', 'rare'] },
+  { level: 3, name: 'Friend',   threshold: 100,  discount: 0.15, unlocks: ['common', 'uncommon', 'rare'] },
+  { level: 4, name: 'Partner',  threshold: 300,  discount: 0.20, unlocks: ['common', 'uncommon', 'rare', 'epic'] },
+  { level: 5, name: 'Family',   threshold: 1000, discount: 0.30, unlocks: ['common', 'uncommon', 'rare', 'epic', 'legendary'] },
 ];
 
 /**
@@ -276,19 +276,6 @@ export const SHOP_ITEMS = [
   // ─── DICE HAND ITEMS (replace dice in DiceHand) ───────────
   // ═══════════════════════════════════════════════════════════
   {
-    id: 'scratched_die',
-    name: 'Standard Die',
-    npcId: 'nick',
-    category: 'dice',
-    rarity: 'common',
-    trustRequired: 1,
-    costPct: 0.08,
-    desc: 'Standard die — no special effect. Durability 12',
-    stubbed: false,
-    descStubbed: '',
-    diceTypeId: 'standard',
-  },
-  {
     id: 'volatile_die',
     name: 'Volatile Die',
     npcId: 'mike',
@@ -300,32 +287,6 @@ export const SHOP_ITEMS = [
     stubbed: false,
     descStubbed: '',
     diceTypeId: 'volatile',
-  },
-  {
-    id: 'weighted_set',
-    name: 'Weighted Set',
-    npcId: 'sal',
-    category: 'dice',
-    rarity: 'epic',
-    trustRequired: 4,
-    costPct: 0.55,
-    desc: '25% come-out sum becomes 7. Durability 8',
-    stubbed: false,
-    descStubbed: '',
-    diceTypeId: 'weighted',
-  },
-  {
-    id: 'precision_set',
-    name: 'Precision Set',
-    npcId: 'diane',
-    category: 'dice',
-    rarity: 'epic',
-    trustRequired: 4,
-    costPct: 0.50,
-    desc: 'Re-roll 2 or 12. Durability 10',
-    stubbed: false,
-    descStubbed: '',
-    diceTypeId: 'precision',
   },
   {
     id: 'glass_dice',
@@ -345,19 +306,6 @@ export const SHOP_ITEMS = [
   // ─── NEW DICE TYPES (Wave 3) ──────────────────────────────
   // ═══════════════════════════════════════════════════════════
   {
-    id: 'lucky_die',
-    name: 'Lucky 11',
-    npcId: 'diane',
-    category: 'dice',
-    rarity: 'uncommon',
-    trustRequired: 1,
-    costPct: 0.25,
-    desc: '20% chance 3:2 payout — green-tinted resin',
-    stubbed: false,
-    descStubbed: '',
-    diceTypeId: 'lucky_11',
-  },
-  {
     id: 'cursed_die',
     name: 'Cursed 13',
     npcId: 'mike',
@@ -365,23 +313,10 @@ export const SHOP_ITEMS = [
     rarity: 'rare',
     trustRequired: 2,
     costPct: 0.20,
-    desc: 'Win costs $5, loss pays $3 — purple elder-wood',
+    desc: 'Win costs ₡1, loss pays ₡1 — purple elder-wood',
     stubbed: false,
     descStubbed: '',
     diceTypeId: 'cursed_13',
-  },
-  {
-    id: 'mirror_die',
-    name: 'Mirror Die',
-    npcId: 'sal',
-    category: 'dice',
-    rarity: 'uncommon',
-    trustRequired: 1,
-    costPct: 0.30,
-    desc: 'Copies other die at 50% — chrome-plated',
-    stubbed: false,
-    descStubbed: '',
-    diceTypeId: 'mirror',
   },
   {
     id: 'snake_eyes_die',
@@ -397,19 +332,6 @@ export const SHOP_ITEMS = [
     diceTypeId: 'snake_eyes',
   },
   {
-    id: 'hustler_die',
-    name: 'Hustler',
-    npcId: 'larry',
-    category: 'dice',
-    rarity: 'epic',
-    trustRequired: 4,
-    costPct: 0.35,
-    desc: '3 wins → free upgrade pick — amber-core',
-    stubbed: false,
-    descStubbed: '',
-    diceTypeId: 'hustler',
-  },
-  {
     id: 'loaded_set',
     name: 'Loaded Set',
     npcId: 'diane',
@@ -422,6 +344,100 @@ export const SHOP_ITEMS = [
     descStubbed: '',
     diceTypeId: 'loaded_set',
     isPair: true,
+  },
+  // ═══════════════════════════════════════════════════════════
+  // ─── NEW DICE TYPES (Sprint C) ────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  {
+    id: 'die_house_bones',
+    name: 'House Bones',
+    npcId: 'diane',
+    category: 'dice',
+    rarity: 'common',
+    trustRequired: 1,
+    costPct: 0.15,
+    desc: 'Immune to cracked penalties — never loses money. Safe starter. Durability 15',
+    stubbed: false,
+    descStubbed: '',
+    diceTypeId: 'house_bones',
+  },
+  {
+    id: 'die_witness',
+    name: 'Witness',
+    npcId: 'sal',
+    category: 'dice',
+    rarity: 'common',
+    trustRequired: 1,
+    costPct: 0.18,
+    desc: 'Reveals opponent die face before roll — strategic intel. Durability 10',
+    stubbed: false,
+    descStubbed: '',
+    diceTypeId: 'witness',
+  },
+  {
+    id: 'die_doom',
+    name: 'Doom d20',
+    npcId: 'mike',
+    category: 'dice',
+    rarity: 'rare',
+    trustRequired: 2,
+    costPct: 0.35,
+    desc: 'Rolls d20: 1=bust, 20=table clear. Extreme risk. Durability 3',
+    stubbed: false,
+    descStubbed: '',
+    diceTypeId: 'doom',
+  },
+  {
+    id: 'die_debt',
+    name: 'Debt Die',
+    npcId: 'ruth',
+    category: 'dice',
+    rarity: 'uncommon',
+    trustRequired: 1,
+    costPct: 0.25,
+    desc: 'Owe ₡1 per roll; pays ₡5 on table clear. Debt accumulates. Durability 12',
+    stubbed: false,
+    descStubbed: '',
+    diceTypeId: 'debt',
+  },
+  {
+    id: 'die_vengeance',
+    name: 'Vengeance',
+    npcId: 'mike',
+    category: 'dice',
+    rarity: 'uncommon',
+    trustRequired: 1,
+    costPct: 0.25,
+    desc: '+1 damage per cracked die in hand (adds to dice sum). Durability 8',
+    stubbed: false,
+    descStubbed: '',
+    diceTypeId: 'vengeance',
+  },
+  {
+    id: 'die_pyre',
+    name: 'Pyre',
+    npcId: 'larry',
+    category: 'dice',
+    rarity: 'rare',
+    trustRequired: 2,
+    costPct: 0.30,
+    desc: '5% chance instant table clear, 95% lose ₡2. All or nothing. Durability 5',
+    stubbed: false,
+    descStubbed: '',
+    diceTypeId: 'pyre',
+  },
+  {
+    id: 'die_split',
+    name: 'Split Die',
+    npcId: 'sal',
+    category: 'dice',
+    rarity: 'uncommon',
+    trustRequired: 2,
+    costPct: 0.28,
+    desc: 'Each die counts independently for payout — double-edged. Durability 10',
+    stubbed: false,
+    descStubbed: '',
+    diceTypeId: 'split',
   },
 ];
 
@@ -654,7 +670,7 @@ export class ShopSystem {
 
   /**
    * Replace a die (or pair) in the DiceHand with a shop-purchased die.
-   * Prefers replacing cracked dice (durability 0), then standard dice.
+   * Prefers replacing cracked dice (durability 0), then house bones (starter dice).
    * For isPair items, replaces TWO slots — both must be available.
    * Returns { success: false, reason } if hand is full or diceHand missing.
    */
@@ -667,7 +683,7 @@ export class ShopSystem {
     const slots = diceHand.slots;
     const slotsNeeded = item.isPair ? 2 : 1;
 
-    // Gather candidate slot indices: prefer cracked, then standard
+    // Gather candidate slot indices: prefer cracked, then house bones, then same-type (for pairs)
     const candidates = [];
 
     // First pass: cracked slots
@@ -677,10 +693,30 @@ export class ShopSystem {
       }
     }
 
-    // Second pass: standard slots (only if we still need more)
+    // Second pass: house bones slots (only if we still need more)
     if (candidates.length < slotsNeeded) {
       for (let i = 0; i < slots.length; i++) {
-        if (slots[i].typeId === 'standard' && !candidates.includes(i)) {
+        if (slots[i].typeId === 'house_bones' && !candidates.includes(i)) {
+          candidates.push(i);
+          if (candidates.length >= slotsNeeded) break;
+        }
+      }
+    }
+
+    // Third pass (isPair only): existing same-type dice already in hand
+    if (item.isPair && candidates.length < slotsNeeded) {
+      for (let i = 0; i < slots.length; i++) {
+        if (slots[i].typeId === item.diceTypeId && !candidates.includes(i)) {
+          candidates.push(i);
+          if (candidates.length >= slotsNeeded) break;
+        }
+      }
+    }
+
+    // Fourth pass (isPair fallback): any non-cracked slot to complete the pair
+    if (item.isPair && candidates.length < slotsNeeded) {
+      for (let i = 0; i < slots.length; i++) {
+        if (slots[i].durability > 0 && !candidates.includes(i)) {
           candidates.push(i);
           if (candidates.length >= slotsNeeded) break;
         }

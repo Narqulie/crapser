@@ -11,8 +11,8 @@
  * - **boss**: Boss fight table — clearing it advances to the next act
  *   (RUN_WON after Act 3 boss)
  * - **shop**: Instant shop interaction with 1–2 NPCs
- * - **mystery**: Random event — could be +$50, -$30, free upgrade, or cracked die
- * - **rest**: Restore 2 durability to all dice + $25 bonus
+ * - **mystery**: Random event — could be +₡12, -₡10, free upgrade, or cracked die
+ * - **rest**: Restore 2 durability to all dice + ₡5 bonus
  *
  * ## Act Structure
  * - Act 1: The Back Alleys (Dive Bar District → Warehouse Row → The Vault)
@@ -71,7 +71,7 @@ export const NODE_TYPES = {
   rest: {
     label: 'Rest',
     icon: '\u{1F3E8}', // hotel
-    description: 'Restore 2 durability to all dice and gain $25',
+    description: 'Restore 2 durability to all dice and gain ₡5',
     hasGame: false,
     hasTarget: false,
     isBoss: false,
@@ -103,21 +103,21 @@ export const MAP_ACTS = [
     id: 'act_1', name: 'The Back Alleys', floors: [
       {
         id: 'floor_1_1', name: 'Dive Bar District', nodes: [
-          { id: 'alley_mike', type: 'table', name: "Mike's Back Alley", npc: 'mike', target: 150, trait: null },
-          { id: 'alley_sal', type: 'table', name: "Sal's Side Game", npc: 'sal', target: 200, minBet: 10, trait: null },
+          { id: 'alley_mike', type: 'table', name: "Mike's Back Alley", npc: 'mike', target: 30, trait: null },
+          { id: 'alley_sal', type: 'table', name: "Sal's Side Game", npc: 'sal', target: 40, minBet: 2, trait: null },
           { id: 'alley_mystery', type: 'mystery', name: 'Lucky Break' },
         ],
       },
       {
         id: 'floor_1_2', name: 'Warehouse Row', nodes: [
-          { id: 'alley_diane', type: 'table', name: "Diane's Table", npc: 'diane', target: 200, minBet: 15, trait: null },
+          { id: 'alley_diane', type: 'table', name: "Diane's Table", npc: 'diane', target: 40, minBet: 3, trait: null },
           { id: 'alley_nick', type: 'shop', name: "Nick's Bargain Bin", npc: 'nick' },
-          { id: 'alley_ruth', type: 'table', name: "Ruth's Back Room", npc: 'ruth', target: 250, trait: 'slippery' },
+          { id: 'alley_ruth', type: 'table', name: "Ruth's Back Room", npc: 'ruth', target: 50, trait: 'slippery' },
         ],
       },
       {
         id: 'floor_1_3', name: 'The Vault', nodes: [
-          { id: 'alley_boss', type: 'boss', name: 'The Vault Keeper', npc: 'ruth', target: 350, trait: 'boss' },
+          { id: 'alley_boss', type: 'boss', name: 'The Vault Keeper', npc: 'ruth', target: 70, trait: 'boss' },
         ],
       },
     ],
@@ -126,21 +126,21 @@ export const MAP_ACTS = [
     id: 'act_2', name: 'The Underground', floors: [
       {
         id: 'floor_2_1', name: 'Smoke-Filled Dens', nodes: [
-          { id: 'ug_mike', type: 'table', name: "Mike's High Stakes", npc: 'mike', target: 300, minBet: 25, trait: null },
-          { id: 'ug_sal', type: 'table', name: "Sal's Rigged Setup", npc: 'sal', target: 350, minBet: 25, trait: 'crooked' },
+          { id: 'ug_mike', type: 'table', name: "Mike's High Stakes", npc: 'mike', target: 60, minBet: 5, trait: null },
+          { id: 'ug_sal', type: 'table', name: "Sal's Rigged Setup", npc: 'sal', target: 70, minBet: 5, trait: 'crooked' },
           { id: 'ug_rest', type: 'rest', name: 'Back Room Breather' },
         ],
       },
       {
         id: 'floor_2_2', name: 'The Switch', nodes: [
           { id: 'ug_diane', type: 'shop', name: "Diane's Dice Emporium", npc: 'diane' },
-          { id: 'ug_larry', type: 'table', name: "Larry's Loan Game", npc: 'larry', target: 400, minBet: 30, trait: null },
+          { id: 'ug_larry', type: 'table', name: "Larry's Loan Game", npc: 'larry', target: 80, minBet: 6, trait: null },
           { id: 'ug_mystery', type: 'mystery', name: 'Whisper in the Dark' },
         ],
       },
       {
         id: 'floor_2_3', name: 'Deep Below', nodes: [
-          { id: 'ug_boss', type: 'boss', name: 'The Pit Boss', npc: 'mike', target: 500, trait: 'boss' },
+          { id: 'ug_boss', type: 'boss', name: 'The Pit Boss', npc: 'mike', target: 100, trait: 'boss' },
         ],
       },
     ],
@@ -149,21 +149,21 @@ export const MAP_ACTS = [
     id: 'act_3', name: 'The House', floors: [
       {
         id: 'floor_3_1', name: 'Marble Halls', nodes: [
-          { id: 'house_sal', type: 'table', name: "Sal's Final Table", npc: 'sal', target: 500, minBet: 40, trait: null },
+          { id: 'house_sal', type: 'table', name: "Sal's Final Table", npc: 'sal', target: 100, minBet: 8, trait: null },
           { id: 'house_mystery', type: 'mystery', name: 'The Vault Key' },
-          { id: 'house_diane', type: 'table', name: "Diane's Last Stand", npc: 'diane', target: 600, minBet: 50, trait: 'slippery' },
+          { id: 'house_diane', type: 'table', name: "Diane's Last Stand", npc: 'diane', target: 120, minBet: 10, trait: 'slippery' },
         ],
       },
       {
         id: 'floor_3_2', name: 'Velvet Ropes', nodes: [
           { id: 'house_larry', type: 'shop', name: "Larry's Final Goods", npc: 'larry' },
-          { id: 'house_mike', type: 'table', name: "Mike's All-In", npc: 'mike', target: 700, minBet: 60, trait: 'crooked' },
-          { id: 'house_ruth', type: 'table', name: "Ruth's Insurance Policy", npc: 'ruth', target: 800, minBet: 75, trait: 'high_stakes' },
+          { id: 'house_mike', type: 'table', name: "Mike's All-In", npc: 'mike', target: 140, minBet: 12, trait: 'crooked' },
+          { id: 'house_ruth', type: 'table', name: "Ruth's Insurance Policy", npc: 'ruth', target: 160, minBet: 15, trait: 'high_stakes' },
         ],
       },
       {
         id: 'floor_3_3', name: 'The Penthouse', nodes: [
-          { id: 'house_boss', type: 'boss', name: 'The House', npc: 'ruth', target: 1000, trait: 'boss' },
+          { id: 'house_boss', type: 'boss', name: 'The House', npc: 'ruth', target: 200, trait: 'boss' },
         ],
       },
     ],

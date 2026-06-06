@@ -8,7 +8,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RGBShiftShader } from 'three/addons/shaders/RGBShiftShader.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import { createWorld, createDieBody, isSettled, hoverDie, launchDie } from './physics.js';
-import { createDie, getTopFace, updateDieType } from './dice.js';
+import { createDie, getTopFace, updateDieType, consumeDieDurability, getDieType, isDieCracked, setupDieAnimations, updateAllDiceAnimations, registerDieAnimation, unregisterDieAnimation } from './dice.js';
 import { RogueRun } from './rogue-run.js';
 import { RogueUI } from './rogue-ui.js';
 import { MetaProgress } from './meta-progress.js';
@@ -18,7 +18,7 @@ import { AudioManager } from './audio.js';
 import { callAnnouncement, callDead } from './announcer.js';
 import { NPC_DEFS } from './npcs.js';
 import { Pot } from './pot.js';
-import { MAP_ACTS, getFloorNodes } from './map.js';
+import { MAP_ACTS } from './map.js';
 
 // ==== CONSTANTS ====
 const SETTLE_FRAMES = 50;
@@ -272,7 +272,7 @@ const pot = new Pot(scene, world, groundBody, dieMat);
 const DICE_OFFSET = 0.75;
 const HOVER_Y = 3;
 const HOVER_Z = 3.3;
-const BET_CHIPS = [5, 10, 25, 50, 100];
+const BET_CHIPS = [1, 2, 5, 10, 20];
 
 const audio = new AudioManager();
 
@@ -287,8 +287,8 @@ const game = rogueRun.game;
 // Initialize dice with typeIds from starting hand
 const startingSlots = rogueRun.diceHandSlots;
 const dice = [
-  { mesh: createDie(startingSlots[0]?.typeId || 'standard'), body: createDieBody(), hitWall: false },
-  { mesh: createDie(startingSlots[1]?.typeId || 'standard'), body: createDieBody(), hitWall: false },
+  { mesh: createDie(startingSlots[0]?.typeId || 'house_bones'), body: createDieBody(), hitWall: false },
+  { mesh: createDie(startingSlots[1]?.typeId || 'house_bones'), body: createDieBody(), hitWall: false },
 ];
 
 dice.forEach((d, i) => {
@@ -296,6 +296,10 @@ dice.forEach((d, i) => {
   world.addBody(d.body);
   hoverDie(d.body, i);
 });
+
+// Register per-frame animation hooks for animated die types (Volatile, Pyre, Doom, Debt, Snake Eyes)
+setupDieAnimations(dice[0].mesh, startingSlots[0]?.typeId || 'house_bones');
+setupDieAnimations(dice[1].mesh, startingSlots[1]?.typeId || 'house_bones');
 
 const lastBounce = [0, 0];
 dice.forEach((d, i) => {
@@ -329,6 +333,9 @@ rogueUI.onDicePickConfirmed = () => {
     const die = picked[i];
     if (die) {
       updateDieType(d.mesh, die.id, die.durability);
+      // Re-register animation hooks for the new die type
+      unregisterDieAnimation(d.mesh);
+      setupDieAnimations(d.mesh, die.id);
     }
     const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
     d.body.position.set(side, HOVER_Y, HOVER_Z);
@@ -356,6 +363,9 @@ rogueUI.onNewRun = () => {
     d.hitWall = false;
     if (newSlots[i]) {
       updateDieType(d.mesh, newSlots[i].typeId, newSlots[i].durability);
+      // Re-register animation hooks for the new die type
+      unregisterDieAnimation(d.mesh);
+      setupDieAnimations(d.mesh, newSlots[i].typeId);
     }
     hoverDie(d.body, i);
   });
@@ -579,14 +589,17 @@ function animate(time) {
 
   pot.sync();
 
+  // Per-frame dice animation updates (Volatile pulse, Pyre particles, Doom wobble, Debt jitter, Snake Eyes pulse)
+  updateAllDiceAnimations(dt);
+
   // ========== MAP NAVIGATION ==========================
   // When the run enters MAP_NAV state (after table clear or run start),
   // show the map overlay so the player can choose their next floor node.
   // Only renders once per state entry; _mapVisible flag prevents re-render.
-  if (rogueRun.runState === 'MAP_NAV') {
+  if (rogueRun.runState === 'MAP_NAV' && Date.now() >= rogueRun._mapNavBlockedUntil) {
     if (!rogueUI._mapVisible) {
-      const nodes = getFloorNodes(MAP_ACTS, rogueRun.currentActIndex, rogueRun.currentFloorIndex);
-      rogueUI.showMap(rogueRun.currentActIndex, rogueRun.currentFloorIndex, nodes, [...rogueRun.visitedNodes]);
+      const mapData = rogueRun.startMap();
+      rogueUI.showMap(mapData.actIndex, mapData.floorIndex, mapData.nodes, [...rogueRun.visitedNodes]);
     }
     // Keep dice hovering during map (same as idle hover)
     hoverBob += 0.04;

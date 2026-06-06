@@ -8,17 +8,17 @@
 //
 // When the player places a bet, `setBet(amount)` breaks the amount
 // into the fewest possible bills (using greedy denomination
-// decomposition) plus $1 coins for remainders, then spawns each
+// decomposition) plus ₡1 coins for remainders, then spawns each
 // item above the pile position with random scatter. Cannon-es
 // bodies let them tumble and stack naturally.
 //
 // Denomination breakdown:
-//   $100 — dark goldenrod bill
-//   $50  — purple bill
-//   $20  — orange bill
-//   $10  — blue bill
-//   $5   — green bill
-//   $1   — gold coin (remainders; Cylinder mesh)
+//   ₡20 — green bill
+//   ₡10 — blue bill
+//   ₡5  — purple bill
+//   ₡2  — orange bill
+//   ₡1  — brown bill
+//   ₡1  — gold coin (remainders; Cylinder mesh)
 //
 // A floating label sprite above the pile shows the total bet.
 // Bill textures are rendered once per denomination on off-screen
@@ -33,18 +33,18 @@ import * as CANNON from 'cannon-es';
  * Bill denominations in descending order (greedy decomposition).
  * @constant {number[]}
  */
-const BILL_DENOMS = [100, 50, 20, 10, 5];
+const BILL_DENOMS = [20, 10, 5, 2, 1];
 
 /**
  * CSS colour per denomination used for bill texture backgrounds.
  * @constant {Object<number, string>}
  */
 const BILL_COLORS = {
-  100: '#b8860b',
-  50:  '#7a4a8a',
-  20:  '#c97d3a',
-  10:  '#4a7cb5',
-  5:   '#4a7c59',
+  20: '#4a7c59',
+  10: '#4a7cb5',
+  5:  '#7a4a8a',
+  2:  '#c97d3a',
+  1:  '#8b4513',
 };
 
 // ========== DIMENSIONS ==========
@@ -94,11 +94,11 @@ function getCoinGeo() {
 /**
  * Render a bill texture on an off-screen canvas.
  *
- * Each denomination gets its own colour and a large "$XX" label.
+ * Each denomination gets its own colour and a large "₡XX" label.
  * Textures are cached on the Pot instance so they're only drawn
  * once per denomination.
  *
- * @param {number} denom — bill denomination (5, 10, 20, 50, or 100).
+ * @param {number} denom — bill denomination (1, 2, 5, 10, or 20).
  * @returns {THREE.CanvasTexture}
  */
 function makeBillTexture(denom) {
@@ -120,10 +120,10 @@ function makeBillTexture(denom) {
   ctx.font = 'bold 48px "SF Mono","Courier New",monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`$${denom}`, 100, 48);
+  ctx.fillText(`₡${denom}`, 100, 48);
   ctx.font = '14px sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText(denom >= 50 ? 'GOLD' : (denom >= 20 ? 'BIG' : 'CASH'), 100, 82);
+  ctx.fillText(denom >= 10 ? 'GOLD' : (denom >= 5 ? 'BIG' : 'CASH'), 100, 82);
   return new THREE.CanvasTexture(c);
 }
 
@@ -189,9 +189,9 @@ export class Pot {
    *
    * Clears all existing bills and coins, decomposes `amount` into
    * physical items using greedy denomination selection, spawns them,
-   * and updates the floating dollar-amount label.
+   * and updates the floating bitcoin-amount label.
    *
-   * @param {number} amount — total bet value in dollars.
+   * @param {number} amount — total bet value in bitcoin.
    */
   setBet(amount) {
     this.clear();
@@ -206,7 +206,7 @@ export class Pot {
       }
     }
 
-    // Remainders become $1 coins
+    // Remainders become ₡1 coins
     for (let i = 0; i < remaining; i++) this._spawnCoin();
 
     this._updateLabel();
@@ -253,7 +253,7 @@ export class Pot {
    * SPAWN_Y. Bill textures are created once and cached.
    *
    * @private
-   * @param {number} denom — denomination (5, 10, 20, 50, 100).
+   * @param {number} denom — denomination (1, 2, 5, 10, 20).
    */
   _spawnBill(denom) {
     if (!this._billTexCache[denom]) this._billTexCache[denom] = makeBillTexture(denom);
@@ -292,7 +292,7 @@ export class Pot {
   }
 
   /**
-   * Spawn a single $1 coin.
+   * Spawn a single ₡1 coin.
    *
    * Creates a gold Cylinder mesh + matching cannon-es Cylinder body
    * at a random position (tighter scatter than bills).
@@ -332,7 +332,7 @@ export class Pot {
   // ========== LABEL ==========
 
   /**
-   * Update the floating "$N" sprite above the pile to match `this.amount`.
+   * Update the floating "₡N" sprite above the pile to match `this.amount`.
    * Creates the label on first call.
    *
    * @private
@@ -352,7 +352,7 @@ export class Pot {
     ctx.textBaseline = 'middle';
     ctx.shadowColor = 'rgba(0,0,0,0.5)';
     ctx.shadowBlur = 6;
-    ctx.fillText(`$${this.amount}`, w / 2, h / 2);
+    ctx.fillText(`₡${this.amount}`, w / 2, h / 2);
     ctx.shadowBlur = 0;
     this._labelTex.needsUpdate = true;
     this.labelSprite.visible = true;

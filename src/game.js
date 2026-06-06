@@ -29,9 +29,9 @@ export class Game {
 
   /** Reset all game state to initial values (fresh session) */
   reset() {
-    this.money = 100;
-    this.bet = 10;
-    this.minBet = 5;
+    this.money = 20;
+    this.bet = 2;
+    this.minBet = 1;
     this.point = null;
     this.phase = 'COME_OUT';
     this.rolling = false;
@@ -94,12 +94,12 @@ export class Game {
       if (sum === 7 || sum === 11) {
         this.money += this.bet * 2;
         this.winCount++;
-        this.message = `natural ${sum} \u2014 win $${this.bet}`;
+        this.message = `natural ${sum} \u2014 win \u20A1${this.bet}`;
         result = 'win';
       } else if (sum === 2 || sum === 3 || sum === 12) {
         const name = CRAPS_NAMES[sum] || sum;
         this.lossCount++;
-        this.message = `${name} \u2014 craps, lose $${this.bet}`;
+        this.message = `${name} \u2014 craps, lose \u20A1${this.bet}`;
         result = 'loss';
       } else {
         this.point = sum;
@@ -111,13 +111,13 @@ export class Game {
       if (sum === this.point) {
         this.money += this.bet * 2;
         this.winCount++;
-        this.message = `made point ${this.point} \u2014 win $${this.bet}`;
+        this.message = `made point ${this.point} \u2014 win \u20A1${this.bet}`;
         this.point = null;
         this.phase = 'COME_OUT';
         result = 'win';
       } else if (sum === 7) {
         this.lossCount++;
-        this.message = `seven out \u2014 lose $${this.bet}`;
+        this.message = `seven out \u2014 lose \u20A1${this.bet}`;
         this.point = null;
         this.phase = 'COME_OUT';
         result = 'loss';
@@ -158,7 +158,7 @@ export class Game {
    * @param {number} amount - Desired bet amount
    */
   setBet(amount) {
-    this.bet = Math.min(Math.max(this.minBet || 5, amount), 100);
+    this.bet = Math.min(Math.max(this.minBet || 1, amount), 20);
   }
 
 }
