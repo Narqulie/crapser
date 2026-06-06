@@ -7,85 +7,118 @@
 
 ## Commands
 - `npm run dev` — dev server (hot reload)
-- `npm run build` — verify build
+- `npm run build` — verify build (36 modules, ~725KB bundle)
 - `npx wrangler pages deploy dist --project-name=crapser --branch=main` — manual deploy
-- CI/CD: `.github/workflows/deploy.yml` auto-deploys `master` git branch via `cloudflare/wrangler-action@v3` with **explicit `accountId: 47aba4286a4f0a7f1117839b0326c2cf`**. `CLOUDFLARE_API_TOKEN` repo secret needs **Cloudflare Pages → Edit** scoped to account.
+- CI/CD: `.github/workflows/deploy.yml` auto-deploys `master` via `cloudflare/wrangler-action@v3` with `accountId: 47aba4286a4f0a7f1117839b0326c2cf`
 
-## Architecture (14 modules, ~3990 lines)
+## Architecture (17 modules, ~10,500 lines)
 
-| Module | Role | Depends on |
-|--------|------|------------|
-| `src/main.js` (644) | Entry: scene, renderer, EffectComposer, game loop, input, settle detection, dead-throw handling | all others |
-| `src/game.js` (126) | Pass-line craps state machine (come-out → point), money/bet, `deadThrow()` refund, `minBet` | none |
-| `src/dice.js` (114) | Dice mesh (RoundedBoxGeometry), canvas pip textures, `getTopFace()` via quaternion dot | three/addons |
-| `src/physics.js` (75) | Cannon-es world, die bodies, `hoverDie()`, `launchDie()`, wall body, `V_THRESHOLD=0.08` | cannon-es |
-| `src/ui.js` (149) | DOM overlay: phase/message/rules, bet chips, history strip, NPC cards, power bar | none |
-| `src/rogue-run.js` (489) | RogueRun wraps Game — 25 upgrade `resolve()` hooks, table advancement, pick-3 state machine | `game.js`, `upgrades.js` |
-| `src/rogue-ui.js` (395) | Pick-3 overlay (cards + stagger + reroll), table display, progress bar, perk overlay, bust/win screens | `upgrades.js` |
-| `src/upgrades.js` (266) | 25 upgrade definitions (4 categories, 3 rarities) + TABLE_CONFIGS (5 tables, one boss) | none |
-| `src/meta-progress.js` (136) | XP/levels (10 thresholds), 8 perks with prerequisites, localStorage, `getBonuses()` | none |
-| `src/announcer.js` (68) | 24 dice-combo aliases + context phrases | none |
-| `src/npcs.js` (145) | 6 NPCs with `placeBet()`, `settleBet()`, `getDialogue()` | none |
-| `src/audio.js` (94) | Web Audio API procedural: roll noise, bounce, settle clicks, win/lose melody | none |
-| `src/pot.js` (237) | Physically-simulated bill/coin pile — Box (bills) + Cylinder (coins) | three, cannon-es |
-| `src/style.css` (1052) | Dark theme, rogue UI (progress bar, perk overlay, boss glow), card-enter animation | none |
+| Module | Lines | Role | Depends on |
+|--------|:-----:|------|------------|
+| `src/main.js` | 732 | Entry: scene, renderer, EffectComposer, game loop, input, settle detection | all others |
+| `src/game.js` | 164 | Pure pass-line craps state machine (come-out→point), money/bet, `deadThrow()` | none |
+| `src/dice.js` | 1130 | 12 type-specific die geometries (cube/sphere/icosahedron/tetrahedron/skull/coin-stack/linked-pair), canvas textures, animation registry, `getTopFace()` | three/addons |
+| `src/dice-types.js` | 381 | 12 DICE_TYPES (4 categories: safe/calc-risk/gambling/build-around), DiceHand class (4 slots, lockedSlots, durability, autoPickLocked) | none |
+| `src/physics.js` | 166 | Cannon-es world, die bodies, `hoverDie()`, `launchDie()`, wall body, `V_THRESHOLD=0.08` | cannon-es |
+| `src/ui.js` | 327 | Main HUD: triple-bar money (₡), result card animation, table progress, synergy badges, bet chips | none |
+| `src/rogue-run.js` | 1525 | **Core state machine** — 6 states, central `resolve()` pipeline (12 dice hooks→charms→bets→talents→synergies→anti-synergies→legendary), map nav, vows, table traits | `game.js`, `dice-types.js`, `upgrades.js` |
+| `src/rogue-ui.js` | 975 | 6 overlays: pick-3, table-start-lock, shop, map nav, vow select, bust/won. Reuses dice-pick DOM | `upgrades.js` |
+| `src/upgrades.js` | 535 | 31 upgrades (4 categories), TABLE_TRAITS (5), SYNERGIES (8 set bonuses), ANTI_SYNERGIES (3 pairs), LEGENDARY (5% instant win) | none |
+| `src/shop.js` | 835 | ShopSystem: 27 items across 6 NPCs, 5 trust tiers (Stranger→Family), weighted NPC selection, buy/sell | none |
+| `src/map.js` | 292 | MAP_ACTS (3 acts × 3 floors × 27 nodes), NODE_TYPES (table/boss/shop/mystery/rest), helper functions | none |
+| `src/meta-progress.js` | 262 | XP/levels (10 thresholds), 8 perks with tree, 4 VOW_DEFS, NPC trust persistence, localStorage | none |
+| `src/pot.js` | 387 | Cosmetic physics money pile — bills (₡20/10/5/2/1) + coins, Cannon-es bodies | three, cannon-es |
+| `src/announcer.js` | 134 | 24 dice-combo aliases + context phrases per result type | none |
+| `src/npcs.js` | 16 | NPC_DEFS: 6 shopkeeper definitions (id, name, color, greeting) | none |
+| `src/audio.js` | 175 | Procedural Web Audio API: roll noise, bounce, settle clicks, win/lose melody | none |
+| `src/style.css` | 2318 | Dark theme, money bar, result cards, 6 overlays (map/shop/vows/dice-pick/pick-3/perk), responsive | none |
+
+## Currency
+**₡ (colón)** — all money is ÷5 from original design. Starting money: ₡20. Bet chips: ₡1/2/5/10/20. NPC trust thresholds: 20/100/300/1000. Pot bill denominations: ₡20/10/5/2/1.
 
 ## RogueRun state machine
 
-`RogueRun.runState` controls what input is accepted:
-- **BETTING** — can bet and roll
+6 states controlling input acceptance:
+- **MAP_NAV** — player chooses next floor node (overlay shown)
+- **TABLE_START_LOCK** — pick 2 dice to lock for entire table
+- **BETTING** — can bet and roll (locked dice auto-picked)
 - **ROLLING** — dice physics in progress (input blocked)
-- **PICKING** — pick-1-of-3 upgrade overlay (only card clicks)
-- **TABLE_CLEAR** — table cleared, overlay with continue button
-- **BUST** — run lost (money ≤ 0, or -50 with Loan Shark)
-- **RUN_WON** — beat final table (The House, $1K target)
+- **PICKING** — pick-1-of-3 upgrade overlay (only on table/boss clear: 1 pick normal, 2 picks boss)
+- **BUST** / **RUN_WON** — end states
 
 `RogueRun.resolve(values)` replaces `game.resolve()` in the game loop:
-1. Optionally applies Hot Dice auto-win on come-out
-2. Calls `game.resolve()` for base craps logic
-3. Runs active upgrade hooks (charms → dice → bet → talents)
-4. Handles table progression — bust (Escape Plan check), table advance, final win
-5. Returns `'win' | 'loss' | 'point' | 'continue' | 'push'`
+1. Auto-picks locked dice each cycle
+2. Applies 12 dice type effects (safe→calc-risk→gambling→build-around)
+3. Calls `game.resolve()` for base craps logic
+4. Runs charm→bet→talent upgrade hooks
+5. Handles synergies→anti-synergies→legendary check
+6. Returns `'win' | 'loss' | 'point' | 'continue' | 'push'`
 
-Table progression: 5 tables (Back Alley $200 → The House $1,000). `tableIndex` increments on clear; `game.minBet` enforces minimums. Final table has boss badge + glow.
+**Map progression**: 3 acts × 3 floors, 27 nodes. Player chooses path per floor. Table nodes advance the run; shop/mystery/rest are optional.
 
-## Upgrade system (25 upgrades, 4 categories, 3 rarities)
+## Dice system (12 types, 4 categories)
+
+| Category | Types | Design intent |
+|----------|-------|---------------|
+| **Safe** | House Bones (dur 15), Witness (dur 10) | Reliable, show prediction |
+| **Calculated Risk** | Glass (2.5x/shatters), Volatile (±50%), Cursed 13 (reversed), Loaded Set (paired +2) | Math-driven risk/reward |
+| **Gambling** | Snake Eyes (sum=2 auto-win), Doom d20 (1=bust, 20=clear) | Push-your-luck |
+| **Build-Around** | Debt (₡1/roll), Vengeance (+1/cracked), Pyre (5% clear), Split (independent payout) | Scale with run state |
+
+**DiceHand**: 4-slot inventory. `lockedSlots` Set marks 2 dice locked per table (auto-picked each roll). Durability per slot, cracked at 0 (20% lose ₡1 on loss). `autoPickLocked()` runs before every roll.
+
+Starting hand: House Bones + Witness + 2 random non-safe dice.
+
+## Upgrade system (31 upgrades, 4 categories, 3 rarities)
 
 | Category | Effect | Examples |
 |----------|--------|----------|
 | **dice** | Modify roll outcomes | Loaded Sevens, Snake Charmer, Hot Dice |
 | **bet** | Modify payout math | Double Down, Compound Streak, Fire Bet |
 | **charm** | One-time use, trigger on events | Rabbit Foot, Lucky Coin |
-| **talent** | Passive income / threshold mods | Bookie ($1/roll), Iron Bank, Loan Shark |
+| **talent** | Passive income / threshold mods | Bookie (₡1/roll), Iron Bank, Loan Shark |
 
-Charms store charge count in `activeUpgrades Map` (from `upgrade.maxCharges`). Others store `-1` (permanent). `hasCharges()` checks > 0; `consume()` decrements/deletes.
+Charms store charge count in `activeUpgrades Map`. Others store `-1` (permanent). `hasCharges()` checks >0; `consume()` decrements/deletes.
 
-Meta-progression: XP = `floor(money/5) + tables*50 + upgrades*10 + win_bonus(200)`. 10 level thresholds (100 → 10,000). 8 perks with prerequisite tree. Persisted via `localStorage` key `crapser_meta`. `getBonuses()` returns startingMoney, rerollTokens, extraPick, interestPerHand, firstFree.
+**Pick triggers**: Table clear = 1 pick. Boss clear = 2 picks. Purist vow: +1/table. Iron Man: +2 at start. Mystery node: 25% chance.
+
+Meta-progression: XP = `money + tables*50 + upgrades*10 + win_bonus(200)`. 10 level thresholds (100→10,000). 8 perks with prerequisite tree. Persisted via `localStorage` key `crapser_meta`.
 
 ## Key gotchas
 - **Settle detection**: `V_THRESHOLD=0.08`. `SETTLE_FRAMES=50`, `SETTLE_TIMEOUT=3000ms` — if 3s and both < 0.3, velocities zeroed and settle forced
-- **Dead throw + rogue state**: `game.deadThrow()` doesn't reset `rogueRun.runState` from `'ROLLING'` — must set `rogueRun.runState = 'BETTING'` manually (main.js:547)
+- **Dead throw + rogue state**: `game.deadThrow()` doesn't reset `rogueRun.runState` from `'ROLLING'` — must set `rogueRun.runState = 'BETTING'` manually
 - **hitWall**: tracked via `body.addEventListener('collide')` + `wallBody.id` check inline in `main.js`
 - **Post-processing**: `RenderPass → FilmPass(0.8,0.5,200,false) → RGBShiftShader(0.003) → VignetteShader(offset:0.6,darkness:1.2) → OutputPass`
 - **Camera**: initial (16, 9, 22), minDist 6, maxDist 60, far plane 200. Fog (60, 200)
-- **OrbitControls**: LEFT mouse = aim/drag (custom), RIGHT = orbit, wheel = dolly, touch TWO = DOLLY_PAN
+- **OrbitControls**: LEFT mouse = aim/drag, RIGHT = orbit, wheel = dolly, touch TWO = DOLLY_PAN
 - **CSS** in `<link>` (`index.html`), not JS-imported
 - **No classes in `main.js`** — module-scoped state + inline functions
-- **Rogue UI elements** live inside `#rogue-info` in `#bottom-area` (footer). `#meta-foot` replaces old `#meta-top` — JS uses child IDs only
-- **Power bar** at `bottom: 190px` (clears the taller footer)
+- **Rogue UI** elements inside `#rogue-info` in `#bottom-area` (footer). `#meta-foot` uses child IDs only
+- **Power bar** at `bottom: 190px` (clears footer)
+- **Dice thrown directly** on aim/space — no per-roll dice pick overlay (removed in refactor). Dice auto-picked from locked slots via `diceHand.autoPickLocked()`
+- **DIFFERENCES FROM OLD AGENTS.md**: Currency is ₡ not $. State machine has 6 states (not 7), no DICE_PICK or TABLE_CLEAR. Tables are map nodes, not linear progression. 12 dice types (not 6). dice.js is 1130 lines with custom geometry builders. npcs.js is 16 lines (shopkeepers only, no betting NPCs).
 
 ## DOM IDs
-Core: `#phase-display`, `#game-message`, `#game-info`, `#point-display`, `#rules-hint`, `#money-display`, `#bottom-bar`, `#dice-result`, `#bet-chips`, `#roll-count`, `#win-count`, `#history-strip`, `#power-bar-bg`, `#power-bar-fill`, `#new-game-btn`, `#npcs`
-Roguelite: `#rogue-info` → `#table-display` + `#run-status` + `#meta-foot` (contains `#meta-display`, `#reroll-display`, `#perk-toggle`), `#pick-overlay` → `#pick-cards` + `#pick-header` + `#pick-actions` (`#pick-reroll`, `#pick-skip`), `#table-clear` → `#table-clear-content` + `#table-clear-btn`, `#game-over` → `#game-over-content`, `#perk-overlay` → `#perk-list`
+Core: `#phase-display`, `#game-message`, `#game-info`, `#point-display`, `#rules-hint`, `#money-display`, `#bottom-bar`, `#dice-result`, `#bet-chips`, `#roll-count`, `#win-count`, `#history-strip`, `#power-bar-bg`, `#power-bar-fill`, `#new-game-btn`
+Roguelite: `#rogue-info` → `#table-display` + `#run-status` + `#meta-foot`, `#pick-overlay`, `#dice-pick-overlay` (reused for table-start-lock), `#map-overlay`, `#shop-overlay`, `#vow-select-overlay`, `#game-over`, `#perk-overlay`, `#result-card`
 
-## NPC conventions
-- `NPCS` array + `NPC_NAMES` const (6 NPCs)
-- `npc.placeBet(outcome)` → stake (0 if broke); `npc.settleBet(outcome, payout)` updates money
-- `npc.getDialogue(eventType)` → array, 60% speak chance, 4.5s display
-- UI: `NPCS` iterated for avatar cards; bubble via absolute `<div>` in card
+## Shop system
+- 27 items across 6 NPCs (Larry, Sal, Mike, Ruth, Nick, Diane)
+- 5 trust tiers: Stranger(0%)→Regular(5%)→Friend(10%)→Partner(20%)→Family(30%)
+- Trust thresholds: ₡20/100/300/1000 spent per NPC
+- Cost: `floor(nodeTarget × costPct × (1 - trustDiscount))`
+- Dice items use new type IDs (house_bones, witness, glass, volatile, cursed_13, loaded_set, snake_eyes, doom, debt, vengeance, pyre, split)
+- Replacement preference: `house_bones` (was `standard`)
+
+## Vows (Optional Difficulty)
+1. **Iron Man**: No shops. +2 starting upgrades.
+2. **Glass Jaw**: House Bones dice start cracked. +50% starting money.
+3. **Speed Run**: 7 hands/table max. Double XP.
+4. **Purist**: No dice type effects. +1 upgrade/table clear.
 
 ## How to add
 1. Create stateless module in `src/` (no THREE/CANNON unless rendering/physics needed)
 2. Export pure functions / classes
-3. Wire into `main.js` (events, game loop) and `ui.js` / `rogue-ui.js` (DOM updates)
+3. Wire into `main.js` (events, game loop) and `ui.js`/`rogue-ui.js` (DOM updates)
 4. For a new upgrade: add entry to `upgrades.js` `UPGRADES` array, then add `has('id')` logic in `rogue-run.js` `resolve()`
+5. For a new dice type: add to `DICE_TYPES` in `dice-types.js`, add resolve hook in `rogue-run.js`, add geometry builder in `dice.js`, add shop entry in `shop.js`

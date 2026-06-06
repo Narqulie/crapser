@@ -123,27 +123,16 @@ export class RogueUI {
 
     if (this.dicePickConfirm) {
       this.dicePickConfirm.addEventListener('click', () => {
-        if (this._tableLockMode) {
-          // Table lock mode: confirm locks 2 dice for the table
-          if (this._pickedSlots.length !== 2) return;
-          const slotA = this._pickedSlots[0];
-          const slotB = this._pickedSlots[1];
-          const success = this.rogueRun.lockTableDice([slotA, slotB]);
-          if (success) {
-            this._tableLockMode = false;
-            this.hideTableStartLock();
-            this.onTableLockDone();
-          }
-        } else {
-          // Normal dice pick mode
-          if (this._pickedSlots.length !== 2) return;
-          const slotA = this._pickedSlots[0];
-          const slotB = this._pickedSlots[1];
-          const success = this.rogueRun.confirmDicePick([slotA, slotB]);
-          if (success) {
-            this.hideDicePick();
-            if (this.onDicePickConfirmed) this.onDicePickConfirmed();
-          }
+        // Only table-lock mode is active (per-roll dice picking removed)
+        if (!this._tableLockMode) return;
+        if (this._pickedSlots.length !== 2) return;
+        const slotA = this._pickedSlots[0];
+        const slotB = this._pickedSlots[1];
+        const success = this.rogueRun.lockTableDice([slotA, slotB]);
+        if (success) {
+          this._tableLockMode = false;
+          this.hideTableStartLock();
+          this.onTableLockDone();
         }
       });
     }
@@ -530,7 +519,7 @@ export class RogueUI {
           </div>
           <span class="dice-slot-durability-label">${s.durability}/${maxDur}</span>
         </div>
-        <div class="dice-slot-effect">${cracked ? 'Cracked \u2014 no effect, 20% lose $2' : (def ? def.effect : '')}</div>
+        <div class="dice-slot-effect">${cracked ? 'Cracked \u2014 no effect, 20% lose ₡1' : (def ? def.effect : '')}</div>
       </div>`;
     }).join('');
 

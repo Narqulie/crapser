@@ -19,7 +19,7 @@ export const PERKS = [
   { id: 'reroll_basic',  name: 'Mulligan',           desc: '1 reroll token per run',         cost: 1, prerequisite: null },
   { id: 'reroll_master', name: 'Double Mulligan',    desc: '2 reroll tokens per run',        cost: 2, prerequisite: 'reroll_basic' },
   { id: 'extra_choice',  name: 'More Options',       desc: 'Pick from 4 upgrades instead of 3', cost: 2, prerequisite: null },
-  { id: 'interest',      name: 'Street Interest',    desc: '+$1 per hand played (passive)',   cost: 1, prerequisite: null },
+  { id: 'interest',      name: 'Street Interest',    desc: '+₡1 per hand played (passive)',   cost: 1, prerequisite: null },
   { id: 'first_free',    name: 'First Pick Free',    desc: 'First upgrade each run is free', cost: 2, prerequisite: null },
   { id: 'xp_boost',      name: 'Quick Learner',      desc: '2x XP gain',                     cost: 1, prerequisite: null },
 ];

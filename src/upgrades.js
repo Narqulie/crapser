@@ -41,7 +41,7 @@
  */
 export const TABLE_TRAITS = [
   { tableIndex: 0, name: 'Back Alley',   trait: null,         description: 'No tricks — pure craps' },
-  { tableIndex: 1, name: 'Dive Bar',     trait: 'slippery',   description: 'Min bet $25',                minBetAdd: 25 },
+  { tableIndex: 1, name: 'Dive Bar',     trait: 'slippery',   description: 'Min bet ₡5',                minBetAdd: 5 },
   { tableIndex: 2, name: 'Crooked Den',  trait: 'crooked',    description: '10% chance result fudged against you', crookedChance: 0.10 },
   { tableIndex: 3, name: 'High Stakes',  trait: 'high_stakes', description: 'Pick dice BEFORE setting bet',         highStakes: true },
   { tableIndex: 4, name: 'The House',    trait: 'boss',        description: '3% chance steals upgrade on loss',    stealChance: 0.03, isBoss: true },
@@ -405,7 +405,7 @@ export const SYNERGIES = {
   dice: {
     set2: {
       description: '+1 free re-roll per hand',
-      implNote: 'Grant one free re-roll token usable during DICE_PICK or roll phase',
+      implNote: 'Grant one free re-roll token usable during roll phase',
     },
     set3: {
       description: 'auto-reroll on 2/3/12',

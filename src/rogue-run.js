@@ -427,15 +427,6 @@ export class RogueRun {
   }
 
   /**
-   * Pick 2 dice from the hand and transition to rolling.
-   * @param {number[]} slotIndices — indices of the 2 slots to pick
-   * @returns {boolean} true if dice were successfully picked
-   */
-  confirmDicePick(slotIndices) {
-    return false; // deprecated: dice are now locked per-table, not per-roll
-  }
-
-  /**
    * All 4 hand slots with type metadata for the dice-pick UI.
    * @type {Array<{ index: number, typeId: string, durability: number, picked: boolean, type: object }>}
    */

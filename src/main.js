@@ -317,37 +317,10 @@ const ui = new UI(game, rogueRun);
 const rogueUI = new RogueUI(rogueRun, ui, shopSystem, NPC_DEFS);
 
 // ==== CALLBACKS ====
-let _pendingVelocity = null; // stored velocity getter for dice pick flow
-
 rogueUI.onShopDone = () => {
   // Shop sequence complete — sync everything
   ui.sync();
   rogueUI.sync();
-};
-rogueUI.onDicePickConfirmed = () => {
-  if (!_pendingVelocity) return;
-  const picked = rogueRun.pickedDice;
-
-  dice.forEach((d, i) => {
-    d.hitWall = false;
-    const die = picked[i];
-    if (die) {
-      updateDieType(d.mesh, die.id, die.durability);
-      // Re-register animation hooks for the new die type
-      unregisterDieAnimation(d.mesh);
-      setupDieAnimations(d.mesh, die.id);
-    }
-    const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
-    d.body.position.set(side, HOVER_Y, HOVER_Z);
-    const v = _pendingVelocity(i);
-    launchDie(d.body, v[0], v[1], v[2]);
-  });
-
-  settleCount = 0;
-  resultPending = false;
-  rollStartTime = Date.now();
-  _pendingVelocity = null;
-  ui.sync();
 };
 rogueUI.onNewRun = () => {
   /**
@@ -484,28 +457,15 @@ function aimThrow() {
   pot.setBet(game.bet);
   audio.playRoll();
 
-  _pendingVelocity = (i) => [
-    dirX * speed + (i === 0 ? -0.3 : 0.3),
-    vy,
-    dirZ * speed,
-  ];
-
-  hideAimVisual();
-  rogueUI.showDicePick();
-  ui.sync();
-}
-
-function doThrow(getVelocity) {
-  if (!rogueRun.roll()) return;
-  pot.setBet(game.bet);
-  audio.playRoll();
-
   dice.forEach((d, i) => {
     d.hitWall = false;
     const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
     d.body.position.set(side, HOVER_Y, HOVER_Z);
-    const v = getVelocity(i);
-    launchDie(d.body, v[0], v[1], v[2]);
+    launchDie(d.body,
+      dirX * speed + (i === 0 ? -0.3 : 0.3),
+      vy,
+      dirZ * speed
+    );
   });
 
   settleCount = 0;
@@ -563,12 +523,17 @@ function forwardThrow() {
   if (!rogueRun.roll()) return;
   pot.setBet(game.bet);
   audio.playRoll();
-  _pendingVelocity = (i) => [
-    i === 0 ? -0.3 : 0.3,
-    5,
-    -8,
-  ];
-  rogueUI.showDicePick();
+
+  dice.forEach((d, i) => {
+    d.hitWall = false;
+    const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
+    d.body.position.set(side, HOVER_Y, HOVER_Z);
+    launchDie(d.body, i === 0 ? -0.3 : 0.3, 5, -8);
+  });
+
+  settleCount = 0;
+  resultPending = false;
+  rollStartTime = Date.now();
   ui.sync();
 }
 
@@ -611,17 +576,6 @@ function animate(time) {
       d.body.velocity.set(0, 0, 0);
       d.body.angularVelocity.set(0, 0, 0);
     });
-  } else if (rogueRun.runState === 'DICE_PICK') {
-    // Keep dice hovering during pick phase, prevent settle detection
-    hoverBob += 0.04;
-    dice.forEach((d, i) => {
-      if (d.body.position.y < 0.5) return;
-      const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
-      const bob = Math.sin(hoverBob + i * 1.5) * 0.06;
-      d.body.position.set(x, HOVER_Y + bob, HOVER_Z);
-      d.body.velocity.set(0, 0, 0);
-      d.body.angularVelocity.set(0, 0, 0);
-    });
   } else if (isAiming) {
     dice.forEach((d, i) => {
       const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
@@ -641,7 +595,7 @@ function animate(time) {
     });
   }
 
-  if (game.rolling && !resultPending && rogueRun.runState !== 'DICE_PICK') {
+  if (game.rolling && !resultPending) {
     const elapsed = Date.now() - rollStartTime;
     const almostStill = elapsed > SETTLE_TIMEOUT && dice.every(d =>
       d.body.velocity.length() < 0.3 && d.body.angularVelocity.length() < 0.3
@@ -719,8 +673,6 @@ function animate(time) {
                 rogueUI.showBust();
               } else if (rogueRun.runState === 'RUN_WON') {
                 rogueUI.showRunWon();
-              } else if (rogueRun.runState === 'DICE_PICK') {
-                rogueUI.showDicePick();
               }
             }, 2800);
           }, 400);

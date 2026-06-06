@@ -15,37 +15,38 @@ Sprint 3 (P3):     NPC shop system — 6 shopkeepers, trust tiers, dual-use econ
 Sprint 4 (Map):    Player-chosen node navigation replaces linear table progression
 Sprint 5 (Vows):   4 difficulty modifiers + balance overhaul
 Sprint 6 (Polish): JSDoc, deduplication, vestigial code removal
+Sprint 7 (Balance): Bug fixes + balance tuning — 9 tasks, 8 files
+Sprint A-E (Refactor): Money compression (₡), pick-per-table, 12 wild dice, non-cube visuals
 ```
 
-**Total**: 6 sprints, ~5,900 insertions, ~440 deletions, 19 files changed.  
-3 new files: `dice-types.js`, `map.js`, `shop.js`.  
-Final state: **17 modules, ~9,600 lines**.
+**Total**: 11 sprints, ~3,500 insertions, ~1,300 deletions, 13+ files changed.  
+Final state: **17 modules, ~10,500 lines**.
 
 ---
 
 ## File Inventory (17 modules)
 
-| # | File | Lines | Role | New? |
-|---|------|:-----:|------|:----:|
-| 1 | `rogue-run.js` | 1,463 | RogueRun state machine: 7 states, resolve (dice→charms→mods→bets→talents→synergies→legendary), map navigation, vows, table traits, shop frequency | — |
-| 2 | `rogue-ui.js` | 898 | 6 overlays: pick-3, dice pick, shop, map, bust/won, perk. Wired to all systems. | — |
-| 3 | `shop.js` | 799 | ShopSystem class: 23 items, 5 trust tiers (Stranger→Family, $0→$5k), weighted NPC selection, buy/sell | ✅ |
-| 4 | `main.js` | 770 | Scene (Three.js), physics (cannon-es), input (aim/drag/space), game loop, drama timing, MAP_NAV detection | — |
-| 5 | `upgrades.js` | 570 | 31 upgrades (4 categories), TABLE_TRAITS (5), SYNERGIES (8 set bonuses), ANTI_SYNERGIES (4 pairs), LEGENDARY (5% instant win), getActiveSynergies() | — |
-| 6 | `pot.js` | 387 | Cosmetic physics money pile (bills + coins, cannon-es bodies) | — |
-| 7 | `style.css` | 2,394 | Complete CSS: money bar, result cards, overlays, map, shop, vows, dice pick, bonus panel, responsive | — |
-| 8 | `ui.js` | 327 | Main HUD: triple-bar money, result card animation, table progress bar, bonus panel (synergy badges), screen flash | — |
-| 9 | `dice-types.js` | 304 | 12 dice types + DiceHand class (4-slot inventory, pick 2, durability, cracked state, replace) | ✅ |
-| 10 | `map.js` | 294 | MAP_ACTS (3 acts × 3 floors × 27 nodes), NODE_TYPES, helpers (getNode, getFloorNodes, isActComplete) | ✅ |
-| 11 | `dice.js` | 286 | Three.js dice meshes (RoundedBoxGeometry), canvas pip textures, type tints, durability visuals, cracked wireframe | — |
-| 12 | `meta-progress.js` | 262 | XP/levels (10 thresholds), 8 perks, 4 VOW_DEFS, NPC trust persistence, timing constants, localStorage | — |
-| 13 | `audio.js` | 175 | Procedural Web Audio: roll noise, bounce, settle clicks, win/lose melodies | — |
-| 14 | `game.js` | 164 | Pure craps state machine (COME_OUT→POINT), resolve(), deadThrow(), setBet() | — |
-| 15 | `physics.js` | 166 | Cannon-es world: wall/ground, die bodies, settle detection (V_THRESHOLD=0.08, 50 frames, 3s timeout) | — |
-| 16 | `announcer.js` | 134 | 24 dice-combo aliases (Snake Eyes, Boxcars, etc.) + context calls per result | — |
-| 17 | `npcs.js` | 16 | NPC_DEFS: 6 shopkeeper definitions (id, name, color, greeting). Stripped from 145L cosmetic bettor system. | — |
-| — | `index.html` | 173 | DOM: 8 overlays, money bar, progress, bonus panel, HUD elements | — |
-| | **TOTAL** | **~9,600** | | |
+| # | File | Lines | Role | 
+|---|------|:-----:|------|
+| 1 | `rogue-run.js` | 1,525 | RogueRun state machine: 6 states, resolve pipeline (dice→charms→bets→talents→synergies→anti-synergies→legendary), map nav, vows, table traits |
+| 2 | `dice.js` | 1,130 | 12 type-specific die geometries, canvas textures, animation registry, `getTopFace()` |
+| 3 | `rogue-ui.js` | 975 | 6 overlays: pick-3, table-start-lock, shop, map, bust/won, perk. Reuses dice-pick DOM |
+| 4 | `shop.js` | 835 | ShopSystem: 27 items, 5 trust tiers (Stranger→Family), weighted NPC selection, buy/sell |
+| 5 | `main.js` | 732 | Scene (Three.js), physics (Cannon-es), input (aim/drag/space), game loop, drama timing |
+| 6 | `upgrades.js` | 535 | 31 upgrades (4 categories), TABLE_TRAITS (5), SYNERGIES (8), ANTI_SYNERGIES (3), LEGENDARY |
+| 7 | `pot.js` | 387 | Cosmetic physics money pile (bills + coins, ₡ denominations) |
+| 8 | `dice-types.js` | 381 | 12 DICE_TYPES + DiceHand class (4 slots, lockedSlots, durability, autoPickLocked) |
+| 9 | `ui.js` | 327 | Main HUD: triple-bar money (₡), result card animation, table progress, synergy badges |
+| 10 | `map.js` | 292 | MAP_ACTS (3 acts × 3 floors × 27 nodes), NODE_TYPES, helpers |
+| 11 | `meta-progress.js` | 262 | XP/levels (10 thresholds), 8 perks, 4 VOW_DEFS, NPC trust persistence, localStorage |
+| 12 | `audio.js` | 175 | Procedural Web Audio: roll noise, bounce, settle clicks, win/lose melodies |
+| 13 | `physics.js` | 166 | Cannon-es world: wall/ground, die bodies, settle detection (V_THRESHOLD=0.08) |
+| 14 | `game.js` | 164 | Pure craps state machine (COME_OUT→POINT), resolve(), deadThrow(), setBet() |
+| 15 | `announcer.js` | 134 | 24 dice-combo aliases + context calls per result |
+| 16 | `npcs.js` | 16 | NPC_DEFS: 6 shopkeeper definitions (id, name, color, greeting) |
+| 17 | `style.css` | 2,318 | Complete CSS: money bar, result cards, 6 overlays, responsive |
+| — | `index.html` | 165 | DOM: overlays, money bar, progress, HUD elements |
+| | **TOTAL** | **~10,500** | |
 
 ---
 
@@ -53,130 +54,111 @@ Final state: **17 modules, ~9,600 lines**.
 
 ### State Machine (rogue-run.js)
 ```
-BETTING → DICE_PICK → ROLLING → RESOLVE → PICKING/MAP_NAV/BUST/RUN_WON
-                                              ↓
-                                          SHOPPING (map node or random)
-                                              ↓
-                                          MAP_NAV (node complete)
-                                              ↓
-                                          selectNode() → BETTING/SHOPPING/MAP_NAV
+MAP_NAV → TABLE_START_LOCK → BETTING → ROLLING → RESOLVE → PICKING/MAP_NAV/BUST/RUN_WON
 ```
 
-7 states. `resolve()` is the central hook pipeline: dice effects → charm hooks → dice mod hooks → bet mod hooks → talent hooks → synergy resolution → anti-synergy detection → legendary check → table traits → _postResolve (state transitions).
+6 states. `resolve()` is the central hook pipeline: auto-pick locked dice → dice type effects (safe→calc-risk→gambling→build-around) → charm hooks → bet mod hooks → talent hooks → synergy resolution → anti-synergy detection → legendary check → _postResolve (state transitions).
 
-### Money = HP + Currency
-Single economy. Spending money at shops reduces your bust buffer. No separate currencies. Trust discounts (0-30%) reward loyalty to specific NPCs. Cost formula: `floor(nodeTarget × costPct × (1 − trustDiscount))`.
-
-### Inner Loop Immutability
-The per-hand flow (BETTING → DICE_PICK → ROLLING → RESOLVE → PICKING) never changed across all 6 sprints. Only the outer progression loop evolved: linear table indexing → player-chosen node map.
+### Currency: ₡ (colón)
+All money ÷5 from original design. Single economy — spending money at shops reduces your bust buffer. Trust discounts (0-30%) reward loyalty to specific NPCs.
 
 ### Dice Hand vs Active Upgrades
 Two parallel systems:
-- **DiceHand** (dice-types.js): 4-slot physical dice inventory, pick 2 per roll, durability per slot, cracked state, visual tints on Three.js meshes
+- **DiceHand** (dice-types.js): 4-slot physical dice inventory, 2 locked per table (auto-picked each roll), durability per slot, cracked state, per-type Three.js geometry
 - **activeUpgrades** (rogue-run.js): Map of upgrade objects, charges (-1 = permanent, >0 = consumable), applied during resolve hooks
+
+### Pick-per-Table
+Dice are locked at the start of each table via TABLE_START_LOCK state. Locked dice are auto-picked every roll (no per-roll dice pick overlay). Upgrades are awarded only on table/boss clear: 1 pick for table, 2 for boss.
+
+---
+
+## Dice System (12 types, 4 categories)
+
+| Category | Types | Durability | Design intent |
+|----------|-------|:----------:|---------------|
+| **Safe** | House Bones, Witness | 15, 10 | Reliable, prediction |
+| **Calculated Risk** | Glass, Volatile, Cursed 13, Loaded Set | 3, 6, 10, 12 | Math-driven risk/reward |
+| **Gambling** | Snake Eyes, Doom d20 | 6, 8 | Push-your-luck |
+| **Build-Around** | Debt, Vengeance, Pyre, Split | 8, 8, 6, 10 | Scale with run state |
+
+**Visual designs**: Cube (House Bones, Loaded Set), sphere/eye (Witness), transparent icosahedron (Glass), glowing icosahedron (Volatile), obsidian octahedron (Cursed 13), tetrahedron (Snake Eyes), skull icosahedron (Doom), coin stack (Debt), scratched knucklebone (Vengeance), ember icosahedron (Pyre), linked cubes (Split).
+
+---
+
+## Upgrade Frequency
+- Picks trigger on: table clear (1 pick) or boss clear (2 picks)
+- Purist vow: +1/table. Iron Man: +2 at start. Mystery node: 25% free
+- 31 total upgrades in pool → ~12-18 picks per run → sees 40-60% of pool
+- No per-hand picking — upgrades are a scarce resource
 
 ---
 
 ## Balance Model
 
-### Upgrade Frequency
-- Picks trigger on: win OR point-established (~70% of hands, was ~49%)
-- ~10-14 upgrades per run (8-12 hands per act × 3 acts ÷ 2)
-- 31 total upgrades in pool → player sees ~35-45% of pool
-- Category weighting favors unfilled categories (makes Legendary achievable)
-
-### Dice Durability
-| Type | Durability | ~Hands | Effect |
-|------|:----------:|:------:|--------|
-| Standard | 12 | 6 | None |
-| Weighted | 8 | 4 | 25% come-out → 7 |
-| Volatile | 6 | 3 | ±50% payout |
-| Seven Die | 6 | 3 | Sum=6→7 once/hand |
-| Glass | 3 | 1-3 | 2.5x payout, shatters on loss |
-| Precision | 10 | 5 | Re-roll 2/12 |
-| Lucky 11 | 8 | 4 | 20% 3:2 odds |
-| Cursed 13 | 10 | 5 | Win −$5 / Loss +$3 |
-| Mirror | 8 | 4 | Copies other die at 25% |
-| Snake Eyes | 6 | 3 | Sum=2 auto-wins |
-| Hustler | 5 | 2-3 | 3 wins = free upgrade |
-| Loaded Set | 12 | 6 | Paired: +2 sum |
-
-Two dice consumed per roll from a 4-slot hand → ~16 total usable throws before all cracked.
-
-### Difficulty Curve (fixed from inverted)
+### Difficulty Curve
 ```
-Act 1 (Alleys, $150-350):  Few upgrades, no synergies, low money  → HARD
-Act 2 (Underground, $300-500):  4-6 upgrades, possible synergy    → MEDIUM
-Act 3 (The House, $500-1000):   8-12 upgrades, synergies active   → HARD (boss traits)
+Act 1 (Alleys, ₡30-70):    Few upgrades, no synergies, low money  → HARD
+Act 2 (Underground, ₡60-100):  4-6 upgrades, possible synergy    → MEDIUM
+Act 3 (The House, ₡100-200):   8-12 upgrades, synergies active   → HARD (boss traits)
 ```
-Table traits escalate: Slippery (+$25 minBet) → Crooked (10% fudge) → High Stakes (dice before bet) → Boss (3% upgrade steal on loss).
 
 ### Shop Economy
-- 23 items (14 functional + 5 dice + 4 charms/mystery)
-- NPC-specific inventories, weighted selection
-- Cost: 15-55% of node target, discounted 0-30% by trust
-- Shops: every ~2 hands (random) + guaranteed on map shop nodes
+- 27 items across 6 NPCs
+- 5 trust tiers: Stranger(0%)→Regular(5%)→Friend(10%)→Partner(20%)→Family(30%)
+- Trust thresholds: ₡20/100/300/1000 spent per NPC
+- Cost: `floor(nodeTarget × costPct × (1 − trustDiscount))`
 
 ### Vows (Optional Difficulty)
 1. **Iron Man**: No shops. +2 starting upgrades.
-2. **Glass Jaw**: Standard dice start cracked. +50% starting money.
-3. **Speed Run**: 5 hands/table max. Double XP.
+2. **Glass Jaw**: House Bones dice start cracked. +50% starting money.
+3. **Speed Run**: 7 hands/table max. Double XP.
 4. **Purist**: No dice type effects. +1 upgrade/table clear.
 
 ---
 
-## Known Issues (Pre-Sprint 7)
+## Sprint 7: Polish & Balance (COMPLETED)
 
-### Bugs
-1. **MAP_NAV shows before result card dismisses** — map overlay renders immediately on node clear, overlapping the 2.8s result card animation. Fix: delay MAP_NAV activation until after result card timeout.
-2. **Vow → Map flow skips MAP_NAV** — after vow selection, goes straight to BETTING instead of showing the map.
-3. **Dead DOM**: `#table-clear` overlay still in index.html (inert, never shown). Internal `TABLE_CONFIGS` still in upgrades.js (vestigial).
-4. **Hustler die tracking**: Per-slot win counter resets when swapping dice. Should be per-die-ID, not per-slot.
-5. **Loaded Set shop edge case**: Buying Loaded Set when hand already has 1 loaded_set — isPair requires 2 free slots, but one slot is occupied by an existing loaded_set. Current code may reject the purchase.
+### Bug Fixes
+- [x] **MAP_NAV timing fix**: Map overlay gated behind result card completion
+- [x] **Vow → Map flow**: Fixed double-reset causing skipped map
+- [x] **Dead code removal**: `#table-clear` DOM + CSS, `TABLE_CONFIGS`, stale button listeners
+- [x] **Hustler tracking**: Changed from per-slot → per-die-ID counter
 
-### Balance Concerns
-6. **Shop frequency too high**: Every 2-3 hands + map shop nodes = ~15-20 potential shop visits. Reduce random shops or remove them entirely (keep only map nodes).
-7. **Rest node too generous**: +2 durability to ALL dice + $25. Nerf to +1 to 2 random dice.
-8. **Mystery node too swingy**: ±$50 flat regardless of act. Scale by act: Act 1 ±$20, Act 2 ±$40, Act 3 ±$60.
-9. **Speed Run hand limit**: 5 hands/table may be too punishing. Test at 7-8.
-10. **Glass Jaw money multiplier**: Stacks multiplicatively with meta perk starting money. Check if this is intended.
-
-### Polish
-11. **No interstitial narrative** — between acts, player sees MAP_NAV with no ceremony. Add brief scene/transition.
-12. **Run variety** — 27 nodes, ~12-18 visited per run. Shuffle node pool per floor for replayability.
-13. **No elite nodes** — between table and boss difficulty. Higher target, guaranteed rare+ reward.
-14. **Dice durability shop** — can only buy full replacements. No repair/fuse/upgrade options.
-15. **Zero tests** — 9,600 lines untested. Start with game.js (pure craps math), dice-types.js (DiceHand), upgrades.js (synergies).
+### Balance Tuning
+- [x] **Shop frequency**: Removed random shops. Only map shop nodes.
+- [x] **Rest node**: +1 durability to 2 random dice (was +2 to all).
+- [x] **Mystery node**: Scaled by act — Act 1 ±₡4, Act 2 ±₡8, Act 3 ±₡12.
+- [x] **Speed Run vow**: 7 hands/table limit (was 5).
+- [x] **Loaded Set shop**: Handled partial slot case.
 
 ---
 
-## Next Sprint — Sprint 7: Polish & Balance
+## Sprint A-E: Refactor (COMPLETED)
 
-### Priority 1: Bug Fixes (1-2 hours)
-- [ ] **MAP_NAV timing fix**: Gate map overlay behind result card completion (2.8s delay after node clear)
-- [ ] **Vow → Map flow**: `showMap()` after vow selection instead of `BETTING`
-- [ ] **Dead code removal**: `#table-clear` DOM, internal `TABLE_CONFIGS`, vestigial button listeners
-- [ ] **Hustler tracking**: Change from per-slot counter → per-die-ID counter on diceHand
+### Sprint A: Money Compression (÷5, ₡ currency)
+- 10 files, ~150 edits — all $→₡, values ÷5
+- game.js: money 100→20, bet 10→2, minBet 5→1
+- main.js: BET_CHIPS [5,10,25,50,100]→[1,2,5,10,20]
+- map.js: 14 node targets ÷5
+- pot.js: BILL_DENOMS [100,50,20,10,5]→[20,10,5,2,1]
 
-### Priority 2: Balance Tuning (1-2 hours)
-- [ ] **Shop frequency**: Remove random shops. Keep only map shop nodes (~4-6 per run).
-- [ ] **Rest node**: +1 durability to 2 random dice (was +2 to all).
-- [ ] **Mystery node**: Scale by act — Act 1 ±$20, Act 2 ±$40, Act 3 ±$60.
-- [ ] **Speed Run vow**: 7 hands/table limit (was 5).
-- [ ] **Loaded Set shop**: Handle partial slot case (1 existing + 1 bought = complete set).
+### Sprint B: Pick-per-Table
+- dice-types.js: lockedSlots Set, autoPickLocked(), lockSlot/unlockSlot
+- rogue-ui.js: showTableStartLock() reusing dice-pick DOM
+- rogue-run.js: TABLE_START_LOCK state, removed DICE_PICK
 
-### Priority 3: Content Expansion (3-4 hours)
-- [ ] **Elite nodes**: Between table and boss. Higher target, guaranteed rare+ pick. 2 per act.
-- [ ] **Interstitial act transitions**: Brief scene between acts (NPC cameo, setting change). ~30 lines.
-- [ ] **Run variety**: Shuffle maps — on second run, alternate node pool per floor.
-- [ ] **Narrative flourishes**: Act transition text, boss entrance text, mystery flavor text.
+### Sprint E: Remove Per-Hand PICKING
+- PICKING only on table/boss clear (not every win/point)
+- _pendingTableClearPicks queue
 
-### Priority 4: Technical Debt (2-3 hours)
-- [ ] **Test harness**: game.js tests (resolve math), dice-types.js tests (DiceHand), upgrades.js tests (synergy calc).
-- [ ] **Error boundaries**: Graceful handling if selectNode receives invalid nodeId.
-- [ ] **Performance**: Check frame drops with new overlays (6 overlays now, up from 3).
+### Sprint C: 12 Wild Dice
+- dice-types.js: Replaced 6 old types with 12 across 4 categories
+- rogue-run.js: New resolve hooks for all 12 types
+- shop.js + upgrades.js: Updated dice entries, removed dead anti-synergy
 
-### Estimated: 8-11 hours total
+### Sprint D: Visual Dice Geometry
+- dice.js: Full rewrite — 12 type-specific geometry builders, canvas textures, animation registry
+- main.js: Integrated animation registry, setupDieAnimations, updateAllDiceAnimations in game loop
 
 ---
 
@@ -186,12 +168,11 @@ Table traits escalate: Slippery (+$25 minBet) → Crooked (10% fudge) → High S
 - **CI/CD**: `.github/workflows/deploy.yml` — auto-deploys `master` branch via `cloudflare/wrangler-action@v3`
 - **Account ID**: `47aba4286a4f0a7f1117839b0326c2cf`
 - **Live URL**: https://crapser.pages.dev
-- **Last deploy**: `bfb1895` — `feat: full roguelike overhaul` — succeeded
 
 ## Commands
 
 ```bash
 npm run dev           # Dev server (hot reload)
-npm run build         # Verify build (36 modules)
+npm run build         # Verify build (36 modules, ~725KB)
 npx wrangler pages deploy dist --project-name=crapser --branch=main  # Manual deploy
 ```

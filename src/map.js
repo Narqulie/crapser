@@ -19,9 +19,7 @@
  * - Act 2: The Underground (Smoke-Filled Dens → The Switch → Deep Below)
  * - Act 3: The House (Marble Halls → Velvet Ropes → The Penthouse)
  *
- * The inner game loop (BETTING→DICE_PICK→ROLLING→RESOLVE→PICKING) is
- * unchanged. Only the outer progression loop is replaced: after clearing
- * a node, the player returns to MAP_NAV to choose the next one.
+ * The inner game loop (BETTING→ROLLING→RESOLVE) is unchanged.
  *
  * @module map
  */
