@@ -149,7 +149,7 @@ export class Game {
       this.money += this.bet;
     }
     this.rolling = false;
-    this.rollCount--;
+    this.rollCount = Math.max(0, this.rollCount - 1);
     this.message = 'dead throw \u2014 roll again';
   }
 
@@ -160,5 +160,4 @@ export class Game {
   setBet(amount) {
     this.bet = Math.min(Math.max(this.minBet || 1, amount), 20);
   }
-
 }

@@ -2,22 +2,27 @@
 
 ## Stack
 - Vite 6, Three.js 0.171.0, Cannon-es 0.20.0
-- No test/lint/typecheck — `npm run build` is the only validation
+- ESLint 10 + Prettier — `npm run lint` / `npm run format`
+- `npm run build` for validation
 - Deployed to Cloudflare Pages: https://crapser.pages.dev
 
 ## Commands
 - `npm run dev` — dev server (hot reload)
-- `npm run build` — verify build (36 modules, ~725KB bundle)
+- `npm run build` — verify build (37 modules, ~725KB bundle)
+- `npm run lint` — ESLint check (0 errors, 0 warnings)
+- `npm run lint:fix` — ESLint auto-fix
+- `npm run format` — Prettier format all files
+- `npm run format:check` — Prettier check (CI)
 - `npx wrangler pages deploy dist --project-name=crapser --branch=main` — manual deploy
 - CI/CD: `.github/workflows/deploy.yml` auto-deploys `master` via `cloudflare/wrangler-action@v3` with `accountId: 47aba4286a4f0a7f1117839b0326c2cf`
 
-## Architecture (17 modules, ~10,500 lines)
+## Architecture (18 modules, ~10,300 lines)
 
 | Module | Lines | Role | Depends on |
 |--------|:-----:|------|------------|
 | `src/main.js` | 732 | Entry: scene, renderer, EffectComposer, game loop, input, settle detection | all others |
 | `src/game.js` | 164 | Pure pass-line craps state machine (come-out→point), money/bet, `deadThrow()` | none |
-| `src/dice.js` | 1130 | 12 type-specific die geometries (cube/sphere/icosahedron/tetrahedron/skull/coin-stack/linked-pair), canvas textures, animation registry, `getTopFace()` | three/addons |
+| `src/dice.js` | 1060 | 12 type-specific die geometries (cube/sphere/icosahedron/tetrahedron/skull/coin-stack/linked-pair), canvas textures, animation registry, `getTopFace()` | three/addons |
 | `src/dice-types.js` | 381 | 12 DICE_TYPES (4 categories: safe/calc-risk/gambling/build-around), DiceHand class (4 slots, lockedSlots, durability, autoPickLocked) | none |
 | `src/physics.js` | 166 | Cannon-es world, die bodies, `hoverDie()`, `launchDie()`, wall body, `V_THRESHOLD=0.08` | cannon-es |
 | `src/ui.js` | 327 | Main HUD: triple-bar money (₡), result card animation, table progress, synergy badges, bet chips | none |
@@ -30,6 +35,7 @@
 | `src/pot.js` | 387 | Cosmetic physics money pile — bills (₡20/10/5/2/1) + coins, Cannon-es bodies | three, cannon-es |
 | `src/announcer.js` | 134 | 24 dice-combo aliases + context phrases per result type | none |
 | `src/npcs.js` | 16 | NPC_DEFS: 6 shopkeeper definitions (id, name, color, greeting) | none |
+| `src/utils.js` | 14 | Fisher-Yates `shuffle()` utility | none |
 | `src/audio.js` | 175 | Procedural Web Audio API: roll noise, bounce, settle clicks, win/lose melody | none |
 | `src/style.css` | 2318 | Dark theme, money bar, result cards, 6 overlays (map/shop/vows/dice-pick/pick-3/perk), responsive | none |
 
@@ -96,7 +102,9 @@ Meta-progression: XP = `money + tables*50 + upgrades*10 + win_bonus(200)`. 10 le
 - **Rogue UI** elements inside `#rogue-info` in `#bottom-area` (footer). `#meta-foot` uses child IDs only
 - **Power bar** at `bottom: 190px` (clears footer)
 - **Dice thrown directly** on aim/space — no per-roll dice pick overlay (removed in refactor). Dice auto-picked from locked slots via `diceHand.autoPickLocked()`
-- **DIFFERENCES FROM OLD AGENTS.md**: Currency is ₡ not $. State machine has 6 states (not 7), no DICE_PICK or TABLE_CLEAR. Tables are map nodes, not linear progression. 12 dice types (not 6). dice.js is 1130 lines with custom geometry builders. npcs.js is 16 lines (shopkeepers only, no betting NPCs).
+- **DIFFERENCES FROM OLD AGENTS.md**: Currency is ₡ not $. State machine has 6 states (not 7), no DICE_PICK or TABLE_CLEAR. Tables are map nodes, not linear progression. 12 dice types (not 6). dice.js is 1060 lines with custom geometry builders. npcs.js is 16 lines (shopkeepers only, no betting NPCs).
+- **ESLint**: Flat config (`eslint.config.js`). Uses `@eslint/js` recommended + `eslint-config-prettier`. Run `npm run lint` before commits.
+- **`src/utils.js`**: Provides `shuffle()` (Fisher-Yates). Importable by any module.
 
 ## DOM IDs
 Core: `#phase-display`, `#game-message`, `#game-info`, `#point-display`, `#rules-hint`, `#money-display`, `#bottom-bar`, `#dice-result`, `#bet-chips`, `#roll-count`, `#win-count`, `#history-strip`, `#power-bar-bg`, `#power-bar-fill`, `#new-game-btn`

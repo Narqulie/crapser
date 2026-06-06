@@ -40,11 +40,30 @@
  * @type {Array<{tableIndex: number, name: string, trait: string|null, description: string, minBetAdd?: number, crookedChance?: number, highStakes?: boolean, stealChance?: number, isBoss?: boolean}>}
  */
 export const TABLE_TRAITS = [
-  { tableIndex: 0, name: 'Back Alley',   trait: null,         description: 'No tricks — pure craps' },
-  { tableIndex: 1, name: 'Dive Bar',     trait: 'slippery',   description: 'Min bet ₡5',                minBetAdd: 5 },
-  { tableIndex: 2, name: 'Crooked Den',  trait: 'crooked',    description: '10% chance result fudged against you', crookedChance: 0.10 },
-  { tableIndex: 3, name: 'High Stakes',  trait: 'high_stakes', description: 'Pick dice BEFORE setting bet',         highStakes: true },
-  { tableIndex: 4, name: 'The House',    trait: 'boss',        description: '3% chance steals upgrade on loss',    stealChance: 0.03, isBoss: true },
+  { tableIndex: 0, name: 'Back Alley', trait: null, description: 'No tricks — pure craps' },
+  { tableIndex: 1, name: 'Dive Bar', trait: 'slippery', description: 'Min bet ₡5', minBetAdd: 5 },
+  {
+    tableIndex: 2,
+    name: 'Crooked Den',
+    trait: 'crooked',
+    description: '10% chance result fudged against you',
+    crookedChance: 0.1,
+  },
+  {
+    tableIndex: 3,
+    name: 'High Stakes',
+    trait: 'high_stakes',
+    description: 'Pick dice BEFORE setting bet',
+    highStakes: true,
+  },
+  {
+    tableIndex: 4,
+    name: 'The House',
+    trait: 'boss',
+    description: '3% chance steals upgrade on loss',
+    stealChance: 0.03,
+    isBoss: true,
+  },
 ];
 
 /**
@@ -214,7 +233,8 @@ export const UPGRADES = [
   {
     id: 'fire_bet',
     name: 'Fire Bet',
-    description: 'Each different point you make adds +0.5x to all point-win multipliers (cumulative)',
+    description:
+      'Each different point you make adds +0.5x to all point-win multipliers (cumulative)',
     category: 'bet',
     rarity: 'rare',
   },
@@ -356,7 +376,7 @@ export const TOTAL_UPGRADES = UPGRADES.length;
  * @returns {object|undefined}
  */
 export function getUpgrade(id) {
-  return UPGRADES.find(u => u.id === id);
+  return UPGRADES.find((u) => u.id === id);
 }
 
 /**
@@ -374,7 +394,7 @@ export function getUpgrade(id) {
  * @returns {Array<object>} pool of available upgrades, possibly with duplicates from favored categories
  */
 export function getAvailableUpgrades(excludeIds, categoryWeights) {
-  const pool = UPGRADES.filter(u => !excludeIds.has(u.id));
+  const pool = UPGRADES.filter((u) => !excludeIds.has(u.id));
 
   // No weighting → return raw pool (backward compatible)
   if (!categoryWeights) return pool;
@@ -390,7 +410,6 @@ export function getAvailableUpgrades(excludeIds, categoryWeights) {
   }
   return weighted;
 }
-
 
 // ========== SYNERGIES (SET BONUSES PER CATEGORY) ============================
 
@@ -520,7 +539,7 @@ export function getActiveSynergies(activeUpgrades) {
   // Check anti-synergies — both IDs must be present in activeUpgrades
   const antiSynergies = [];
   for (const anti of ANTI_SYNERGIES) {
-    if (anti.pair.every(id => activeIds.includes(id))) {
+    if (anti.pair.every((id) => activeIds.includes(id))) {
       antiSynergies.push(anti);
     }
   }

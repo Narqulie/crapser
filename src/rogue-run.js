@@ -1,8 +1,9 @@
 import { Game } from './game.js';
 import { UPGRADES, getAvailableUpgrades, getActiveSynergies, TABLE_TRAITS } from './upgrades.js';
 import { DiceHand, getStartingHand, getDieType, isCracked, crackedEffect } from './dice-types.js';
-import { VOW_DEFS, RESULT_CARD_DELAY, RESULT_CARD_DISPLAY } from './meta-progress.js';
+import { RESULT_CARD_DELAY, RESULT_CARD_DISPLAY } from './meta-progress.js';
 import { MAP_ACTS, getNode, getFloorNodes, getNextFloors, isActComplete } from './map.js';
+import { shuffle } from './utils.js';
 
 /**
  * RogueRun wraps a Game instance with roguelite progression.
@@ -68,12 +69,12 @@ export class RogueRun {
     this._mapNavBlockedUntil = 0;
     this._synergyRerolls = 0;
     this._synergies = null;
-    this._unluckyBonus = false;   // unlucky streak flag: next roll gets +15% re-roll
-    this._mapNavBlockedUntil = 0;   // block MAP_NAV until result card anim finishes
+    this._unluckyBonus = false; // unlucky streak flag: next roll gets +15% re-roll
+    this._mapNavBlockedUntil = 0; // block MAP_NAV until result card anim finishes
     this._hustlerFreePick = false; // flag: Hustler just earned a free pick
     this._pendingTableClearPicks = 0; // upgrades remaining from table/boss clear pick
-    this.pendingShops = [];       // NPC IDs queued for shop visits
-    this.currentShopNpc = null;   // currently visiting NPC (null if none)
+    this.pendingShops = []; // NPC IDs queued for shop visits
+    this.currentShopNpc = null; // currently visiting NPC (null if none)
 
     // Reroll tokens from meta
     this.rerollTokens = bonuses.rerollTokens || 0;
@@ -109,7 +110,7 @@ export class RogueRun {
         case 'no_shops': {
           // Iron Man: +2 free upgrades at start
           const pool = getAvailableUpgrades(new Set());
-          const shuffled = [...pool].sort(() => Math.random() - 0.5);
+          const shuffled = shuffle(pool);
           for (let i = 0; i < Math.min(shuffled.length, this.vow.bonus.extraUpgrades || 0); i++) {
             const upg = shuffled[i];
             if (upg.maxCharges) {
@@ -186,7 +187,7 @@ export class RogueRun {
    * @type {boolean}
    */
   get canRoll() {
-    return this.runState === 'BETTING' && this.game.canRoll && !this.game.bankrupt;
+    return this.runState === 'BETTING' && this.game.canRoll && this.game.money > 0;
   }
 
   /**
@@ -204,7 +205,9 @@ export class RogueRun {
    * @type {boolean}
    */
   get isBust() {
-    return this.game.money <= this.bustThreshold && this.game.phase === 'COME_OUT' && this.handCount > 0;
+    return (
+      this.game.money <= this.bustThreshold && this.game.phase === 'COME_OUT' && this.handCount > 0
+    );
   }
 
   /**
@@ -213,8 +216,16 @@ export class RogueRun {
    * @type {boolean}
    */
   get isRunWon() {
-    if (!this.currentNode || (this.currentNode.type !== 'table' && this.currentNode.type !== 'boss')) return false;
-    return this.game.money >= this.currentNode.target && this.game.phase === 'COME_OUT' && this.handCount > 0;
+    if (
+      !this.currentNode ||
+      (this.currentNode.type !== 'table' && this.currentNode.type !== 'boss')
+    )
+      return false;
+    return (
+      this.game.money >= this.currentNode.target &&
+      this.game.phase === 'COME_OUT' &&
+      this.handCount > 0
+    );
   }
 
   /**
@@ -234,7 +245,7 @@ export class RogueRun {
 
     while (act && floorIdx < act.floors.length) {
       const floorNodes = getFloorNodes(MAP_ACTS, actIdx, floorIdx);
-      const unvisited = floorNodes.filter(n => !this.visitedNodes.has(n.id));
+      const unvisited = floorNodes.filter((n) => !this.visitedNodes.has(n.id));
       if (unvisited.length > 0) break;
 
       // Advance to next floor/act
@@ -291,7 +302,7 @@ export class RogueRun {
         }
         // Apply trait-specific minBetAdd
         if (node.trait) {
-          const traitDef = TABLE_TRAITS.find(t => t.trait === node.trait);
+          const traitDef = TABLE_TRAITS.find((t) => t.trait === node.trait);
           if (traitDef?.minBetAdd) {
             this.game.minBet += traitDef.minBetAdd;
             if (this.game.bet < this.game.minBet) {
@@ -331,7 +342,7 @@ export class RogueRun {
         if (roll < 0.25) {
           this.game.money += actScale;
           this.game.message = `Mystery: found ₡${actScale}!`;
-        } else if (roll < 0.50) {
+        } else if (roll < 0.5) {
           this.game.money = Math.max(0, this.game.money - graceAmount);
           this.game.message = `Mystery: lost ₡${graceAmount}...`;
         } else if (roll < 0.75 && this.activeUpgrades.size < UPGRADES.length) {
@@ -379,7 +390,10 @@ export class RogueRun {
           }
           const count = Math.min(2, aliveIndices.length);
           for (let i = 0; i < count; i++) {
-            this.diceHand.slots[aliveIndices[i]].durability = Math.min(12, this.diceHand.slots[aliveIndices[i]].durability + 1);
+            this.diceHand.slots[aliveIndices[i]].durability = Math.min(
+              12,
+              this.diceHand.slots[aliveIndices[i]].durability + 1,
+            );
           }
           this.game.message = `Rest: +1 dur to ${count} die(s) + ₡5 bonus`;
         } else {
@@ -488,16 +502,22 @@ export class RogueRun {
     const _synergyState = getActiveSynergies(this.activeUpgrades);
 
     const _antiFlag = {
-      doubleDownNerf: false,    // double_down + loan_shark → -10% payout
+      doubleDownNerf: false, // double_down + loan_shark → -10% payout
       insuranceVolatile: false, // insurance + volatile die → refund -1
-      noStreakOnLoss: false,    // compound_streak + all_weather → streak frozen on loss
+      noStreakOnLoss: false, // compound_streak + all_weather → streak frozen on loss
     };
 
     for (const anti of _synergyState.antiSynergies) {
       const [a, b] = anti.pair;
-      if ((a === 'double_down' && b === 'loan_shark') || (a === 'loan_shark' && b === 'double_down'))
+      if (
+        (a === 'double_down' && b === 'loan_shark') ||
+        (a === 'loan_shark' && b === 'double_down')
+      )
         _antiFlag.doubleDownNerf = true;
-      if ((a === 'compound_streak' && b === 'all_weather') || (a === 'all_weather' && b === 'compound_streak'))
+      if (
+        (a === 'compound_streak' && b === 'all_weather') ||
+        (a === 'all_weather' && b === 'compound_streak')
+      )
         _antiFlag.noStreakOnLoss = true;
     }
 
@@ -510,12 +530,12 @@ export class RogueRun {
     const isPurist = this.vow && this.vow.effect === 'no_dice_effects';
 
     // Dice-type anti-synergies — checked against picked dice (not in activeUpgrades)
-    if (this.activeUpgrades.has('insurance') && pickedDice.some(d => d.id === 'volatile'))
+    if (this.activeUpgrades.has('insurance') && pickedDice.some((d) => d.id === 'volatile'))
       _antiFlag.insuranceVolatile = true;
 
     // Reset per-hand tracker on new come-out roll
     if (previousPhase === 'COME_OUT') {
-    this._synergyRerolls = 0;
+      this._synergyRerolls = 0;
       this._synergies = null;
     }
 
@@ -560,7 +580,7 @@ export class RogueRun {
             this.game.message += ` (glass +₡${glassBonus})`;
           } else if (diceResult === 'loss') {
             // Shatters: set durability to 0
-            const glassSlot = this.diceHand.slots.find(s => s.typeId === 'glass' && s.picked);
+            const glassSlot = this.diceHand.slots.find((s) => s.typeId === 'glass' && s.picked);
             if (glassSlot) glassSlot.durability = 0;
             this.game.message += ' (glass shattered!)';
           }
@@ -644,7 +664,7 @@ export class RogueRun {
         case 'vengeance':
           // +1 per cracked die in hand
           {
-            const crackedCount = this.diceHand.slots.filter(s => s.durability <= 0).length;
+            const crackedCount = this.diceHand.slots.filter((s) => s.durability <= 0).length;
             if (crackedCount > 0) {
               diceSum += crackedCount;
               diceResult = this._resolveDiceSum(diceSum, previousPhase, previousPoint, diceResult);
@@ -693,7 +713,7 @@ export class RogueRun {
     // ─── LOADED SET PAIR: both dice loaded_set → +2 sum (clamped to 6 per face) ──
     // Purist vow: no dice type effects, skip pair bonus
     if (pickedDice.length === 2 && !isPurist) {
-      const bothLoadedSet = pickedDice.every(d => d.id === 'loaded_set' && !isCracked(d));
+      const bothLoadedSet = pickedDice.every((d) => d.id === 'loaded_set' && !isCracked(d));
       if (bothLoadedSet) {
         const v1 = Math.min(values[0] + 1, 6);
         const v2 = Math.min(values[1] + 1, 6);
@@ -786,7 +806,12 @@ export class RogueRun {
     // ========== DICE MOD HOOKS ==========================
 
     // Loaded Dice: on come-out, 6 or 10 win
-    if (result !== 'win' && previousPhase === 'COME_OUT' && has('loaded_dice') && (sum === 6 || sum === 10)) {
+    if (
+      result !== 'win' &&
+      previousPhase === 'COME_OUT' &&
+      has('loaded_dice') &&
+      (sum === 6 || sum === 10)
+    ) {
       this.game.money += this.game.bet * 2;
       this.game.winCount++;
       this.game.lossCount--;
@@ -795,7 +820,12 @@ export class RogueRun {
     }
 
     // Snake Charmer: 2 and 12 win on come-out
-    if (result === 'loss' && previousPhase === 'COME_OUT' && (sum === 2 || sum === 12) && has('snake_charmer')) {
+    if (
+      result === 'loss' &&
+      previousPhase === 'COME_OUT' &&
+      (sum === 2 || sum === 12) &&
+      has('snake_charmer')
+    ) {
       this.game.money += this.game.bet * 2;
       this.game.winCount++;
       this.game.lossCount--;
@@ -804,7 +834,13 @@ export class RogueRun {
     }
 
     // Bouncy Dice: 25% to save on seven-out
-    if (result === 'loss' && sum === 7 && previousPhase === 'POINT' && has('bouncy_dice') && Math.random() < 0.25) {
+    if (
+      result === 'loss' &&
+      sum === 7 &&
+      previousPhase === 'POINT' &&
+      has('bouncy_dice') &&
+      Math.random() < 0.25
+    ) {
       this.game.money += this.game.bet;
       this.game.phase = 'POINT';
       this.game.point = previousPoint;
@@ -824,7 +860,12 @@ export class RogueRun {
     }
 
     // Loaded Sevens: come-out 7 pays 3x
-    if (finalResult === 'win' && sum === 7 && previousPhase === 'COME_OUT' && has('loaded_sevens')) {
+    if (
+      finalResult === 'win' &&
+      sum === 7 &&
+      previousPhase === 'COME_OUT' &&
+      has('loaded_sevens')
+    ) {
       this.game.money += this.game.bet;
       if (this.game.message.includes('natural')) {
         this.game.message += ' (loaded 7s!)';
@@ -875,9 +916,7 @@ export class RogueRun {
 
     // Double Down: all wins pay 3x instead of 2x
     if (finalResult === 'win' && has('double_down')) {
-      const extra = _antiFlag.doubleDownNerf
-        ? Math.floor(this.game.bet * 0.9)
-        : this.game.bet;
+      const extra = _antiFlag.doubleDownNerf ? Math.floor(this.game.bet * 0.9) : this.game.bet;
       this.game.money += extra;
     }
 
@@ -907,13 +946,25 @@ export class RogueRun {
     }
 
     // Insurance: refund half on come-out loss
-    if (result === 'loss' && previousPhase === 'COME_OUT' && has('insurance') && sum !== 2 && sum !== 12) {
+    if (
+      result === 'loss' &&
+      previousPhase === 'COME_OUT' &&
+      has('insurance') &&
+      sum !== 2 &&
+      sum !== 12
+    ) {
       let refund = Math.floor(this.game.bet / 2);
       if (_antiFlag.insuranceVolatile) refund = Math.max(0, refund - 1);
       this.game.money += refund;
       this.game.message += ` (insurance: -₡${refund})`;
     }
-    if (result === 'loss' && previousPhase === 'COME_OUT' && has('insurance') && (sum === 2 || sum === 12) && !has('snake_charmer')) {
+    if (
+      result === 'loss' &&
+      previousPhase === 'COME_OUT' &&
+      has('insurance') &&
+      (sum === 2 || sum === 12) &&
+      !has('snake_charmer')
+    ) {
       let refund = Math.floor(this.game.bet / 2);
       if (_antiFlag.insuranceVolatile) refund = Math.max(0, refund - 1);
       this.game.money += refund;
@@ -989,15 +1040,17 @@ export class RogueRun {
     this._synergies = _finalSynergy;
 
     // dice 2-set: +1 free re-roll per hand
-    if (_finalSynergy.synergies.some(s => s.category === 'dice' && s.tier === 'set2')) {
+    if (_finalSynergy.synergies.some((s) => s.category === 'dice' && s.tier === 'set2')) {
       this._synergyRerolls++;
     }
 
     // dice 3-set: auto-reroll on 2/3/12
-    if (_finalSynergy.synergies.some(s => s.category === 'dice' && s.tier === 'set3')) {
+    if (_finalSynergy.synergies.some((s) => s.category === 'dice' && s.tier === 'set3')) {
       if (diceSum === 2 || diceSum === 3 || diceSum === 12) {
         let newSum;
-        do { newSum = Math.floor(Math.random() * 11) + 2; } while (newSum > 12 || newSum < 2);
+        do {
+          newSum = Math.floor(Math.random() * 11) + 2;
+        } while (newSum > 12 || newSum < 2);
         finalResult = this._resolveDiceSum(newSum, previousPhase, previousPoint, diceResult);
         diceSum = newSum;
         this.game.message += ` (synergy: dice re-roll \u2192 ${newSum})`;
@@ -1005,14 +1058,17 @@ export class RogueRun {
     }
 
     // bet 2-set: +15% payout on wins
-    if (finalResult === 'win' && _finalSynergy.synergies.some(s => s.category === 'bet' && s.tier === 'set2')) {
+    if (
+      finalResult === 'win' &&
+      _finalSynergy.synergies.some((s) => s.category === 'bet' && s.tier === 'set2')
+    ) {
       const bonus = Math.floor(this.game.bet * 0.15);
       this.game.money += bonus;
       this.game.message += ` (synergy: +₡${bonus})`;
     }
 
     // bet 3-set: 1% interest per hand
-    if (_finalSynergy.synergies.some(s => s.category === 'bet' && s.tier === 'set3')) {
+    if (_finalSynergy.synergies.some((s) => s.category === 'bet' && s.tier === 'set3')) {
       const interest = Math.floor(this.game.money * 0.01);
       if (interest > 0) {
         this.game.money += interest;
@@ -1021,9 +1077,9 @@ export class RogueRun {
     }
 
     // charm 2-set: +1 charge to all active charms
-    if (_finalSynergy.synergies.some(s => s.category === 'charm' && s.tier === 'set2')) {
+    if (_finalSynergy.synergies.some((s) => s.category === 'charm' && s.tier === 'set2')) {
       for (const [id, charge] of this.activeUpgrades) {
-        const def = UPGRADES.find(u => u.id === id);
+        const def = UPGRADES.find((u) => u.id === id);
         if (def && def.category === 'charm') {
           this.activeUpgrades.set(id, Math.min(charge + 1, def.maxCharges));
         }
@@ -1031,10 +1087,10 @@ export class RogueRun {
     }
 
     // charm 3-set: charms don't consume on 7/11 natural
-    if (_finalSynergy.synergies.some(s => s.category === 'charm' && s.tier === 'set3')) {
+    if (_finalSynergy.synergies.some((s) => s.category === 'charm' && s.tier === 'set3')) {
       if ((diceSum === 7 || diceSum === 11) && previousPhase === 'COME_OUT') {
         for (const [id, charge] of this.activeUpgrades) {
-          const def = UPGRADES.find(u => u.id === id);
+          const def = UPGRADES.find((u) => u.id === id);
           if (def && def.category === 'charm') {
             this.activeUpgrades.set(id, Math.min(charge + 1, def.maxCharges));
           }
@@ -1043,12 +1099,12 @@ export class RogueRun {
     }
 
     // talent 2-set: +$2 passive income per roll
-    if (_finalSynergy.synergies.some(s => s.category === 'talent' && s.tier === 'set2')) {
+    if (_finalSynergy.synergies.some((s) => s.category === 'talent' && s.tier === 'set2')) {
       this.game.money += 1;
     }
 
     // talent 3-set: double all passive income
-    if (_finalSynergy.synergies.some(s => s.category === 'talent' && s.tier === 'set3')) {
+    if (_finalSynergy.synergies.some((s) => s.category === 'talent' && s.tier === 'set3')) {
       // Bookie already gave $1 — add another $1
       if (has('bookie')) {
         this.game.money += 1;
@@ -1058,7 +1114,7 @@ export class RogueRun {
         this.game.money += 1;
       }
       // talent 2-set synergy: already added $2, double it → add another $2
-      if (_finalSynergy.synergies.some(s => s.category === 'talent' && s.tier === 'set2')) {
+      if (_finalSynergy.synergies.some((s) => s.category === 'talent' && s.tier === 'set2')) {
         this.game.money += 1;
       }
     }
@@ -1112,7 +1168,8 @@ export class RogueRun {
         this.game.phase = 'POINT';
         newResult = 'point';
       }
-    } else { // POINT
+    } else {
+      // POINT
       if (newSum === 7) {
         this.game.lossCount++;
         this.game.phase = 'COME_OUT';
@@ -1152,17 +1209,23 @@ export class RogueRun {
 
     // ─── BOOKKEEPING ──────────────────────────────────
     this.handCount++;
-    this._tableHandCount++;  // per-table hand tracker (used by speed_run vow)
+    this._tableHandCount++; // per-table hand tracker (used by speed_run vow)
     this._lastResult = finalResult;
     this._lastSum = sum;
     this._lastPreviousPoint = previousPoint;
 
     // ========== NODE TRAITS (DIFFICULTY MODIFIERS) =========
     const nodeTraitName = this.currentNode?.trait;
-    const tableTrait = nodeTraitName ? (TABLE_TRAITS.find(t => t.trait === nodeTraitName) || {}) : {};
+    const tableTrait = nodeTraitName
+      ? TABLE_TRAITS.find((t) => t.trait === nodeTraitName) || {}
+      : {};
 
     // Crooked: chance to fudge a win into a loss (upgrade bonuses kept — thematically stolen)
-    if (finalResult === 'win' && tableTrait.crookedChance && Math.random() < tableTrait.crookedChance) {
+    if (
+      finalResult === 'win' &&
+      tableTrait.crookedChance &&
+      Math.random() < tableTrait.crookedChance
+    ) {
       // Undo base win payout
       this.game.money -= this.game.bet * 2;
       this.game.winCount--;
@@ -1174,12 +1237,16 @@ export class RogueRun {
     }
 
     // Boss table: chance to steal a random upgrade on loss
-    if (finalResult === 'loss' && tableTrait.stealChance && Math.random() < tableTrait.stealChance) {
+    if (
+      finalResult === 'loss' &&
+      tableTrait.stealChance &&
+      Math.random() < tableTrait.stealChance
+    ) {
       const activeIds = Array.from(this.activeUpgrades.keys());
       if (activeIds.length > 0) {
         const stolenId = activeIds[Math.floor(Math.random() * activeIds.length)];
         this.activeUpgrades.delete(stolenId);
-        const def = UPGRADES.find(u => u.id === stolenId);
+        const def = UPGRADES.find((u) => u.id === stolenId);
         this.game.message += ` (${def ? def.name : 'upgrade'} stolen!)`;
       }
     }
@@ -1214,7 +1281,13 @@ export class RogueRun {
         this.currentShopNpc = null;
         this.runState = 'BUST';
       }
-    } else if (this.currentNode && (this.currentNode.type === 'table' || this.currentNode.type === 'boss') && this.game.money >= this.currentNode.target && this.game.phase === 'COME_OUT' && this.handCount > 0) {
+    } else if (
+      this.currentNode &&
+      (this.currentNode.type === 'table' || this.currentNode.type === 'boss') &&
+      this.game.money >= this.currentNode.target &&
+      this.game.phase === 'COME_OUT' &&
+      this.handCount > 0
+    ) {
       // Node cleared!
       // Reset per-node hand counter (speed_run tracking)
       this._tableHandCount = 0;
@@ -1291,17 +1364,10 @@ export class RogueRun {
         this.diceHand.lockedSlots.clear();
         this.runState = 'MAP_NAV';
       }
-    } else if (
-      this.game.phase === 'COME_OUT' &&
-      finalResult === 'win' &&
-      this.handCount > 0
-    ) {
+    } else if (this.game.phase === 'COME_OUT' && finalResult === 'win' && this.handCount > 0) {
       this.game.message = 'nice win! keep rolling...';
       this.runState = 'BETTING';
-    } else if (
-      finalResult === 'point' &&
-      this.handCount > 0
-    ) {
+    } else if (finalResult === 'point' && this.handCount > 0) {
       this.game.message = 'point established — roll to hit it';
       this.runState = 'BETTING';
     } else if (
@@ -1336,7 +1402,7 @@ export class RogueRun {
     // Count active upgrades per category for weighting
     const categoryCounts = { dice: 0, bet: 0, charm: 0, talent: 0 };
     for (const [id] of this.activeUpgrades) {
-      const def = UPGRADES.find(u => u.id === id);
+      const def = UPGRADES.find((u) => u.id === id);
       if (def && Object.prototype.hasOwnProperty.call(categoryCounts, def.category)) {
         categoryCounts[def.category]++;
       }
@@ -1354,7 +1420,7 @@ export class RogueRun {
     }
 
     // Shuffle weighted pool and deduplicate into final picks
-    const shuffled = [...weightedPool].sort(() => Math.random() - 0.5);
+    const shuffled = shuffle(weightedPool);
     const seen = new Set();
     const picks = [];
     for (const upg of shuffled) {
@@ -1375,7 +1441,7 @@ export class RogueRun {
    * @param {string} id — the upgrade's unique identifier
    */
   applyUpgrade(id) {
-    const upgrade = UPGRADES.find(u => u.id === id);
+    const upgrade = UPGRADES.find((u) => u.id === id);
     if (!upgrade) return;
 
     if (upgrade.maxCharges) {
@@ -1476,14 +1542,14 @@ export class RogueRun {
    */
   getActiveUpgradeList() {
     const list = Array.from(this.activeUpgrades.entries()).map(([id, charges]) => {
-      const def = UPGRADES.find(u => u.id === id);
+      const def = UPGRADES.find((u) => u.id === id);
       if (!def) return { id, name: id, desc: '', category: '?', rarity: 'common', charges: 0 };
       return { ...def, charges };
     });
 
     // Attach active synergy info
     const synState = this._synergies || getActiveSynergies(this.activeUpgrades);
-    list.synergies = synState.synergies.map(s => `${s.category} ${s.tier}`);
+    list.synergies = synState.synergies.map((s) => `${s.category} ${s.tier}`);
     list.legendary = !!synState.legendary;
 
     return list;
@@ -1501,7 +1567,7 @@ export class RogueRun {
   getRunSummary() {
     const synState = this._synergies || getActiveSynergies(this.activeUpgrades);
     // Count visited table/boss nodes for backward-compat XP calc
-    const visitedTableNodes = [...this.visitedNodes].filter(id => {
+    const visitedTableNodes = [...this.visitedNodes].filter((id) => {
       const node = getNode(MAP_ACTS, id);
       return node && (node.type === 'table' || node.type === 'boss');
     }).length;
@@ -1516,8 +1582,8 @@ export class RogueRun {
       actIndex: this.currentActIndex,
       floorIndex: this.currentFloorIndex,
       tablesCleared: visitedTableNodes,
-      upgrades: this.getActiveUpgradeList().map(u => u.name),
-      synergies: synState.synergies.map(s => `${s.category} ${s.tier}`),
+      upgrades: this.getActiveUpgradeList().map((u) => u.name),
+      synergies: synState.synergies.map((s) => `${s.category} ${s.tier}`),
       legendary: !!synState.legendary,
       diceHand: this.diceHandSlots,
     };

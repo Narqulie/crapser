@@ -1,4 +1,3 @@
-import { getUpgrade } from './upgrades.js';
 import { PERKS, VOW_DEFS } from './meta-progress.js';
 import { MAP_ACTS } from './map.js';
 
@@ -55,7 +54,6 @@ export class RogueUI {
     this.tableEl = document.getElementById('table-display');
     this.metaEl = document.getElementById('meta-display');
     this.rerollEl = document.getElementById('reroll-display');
-
 
     // Perk overlay
     this.perkOverlay = document.getElementById('perk-overlay');
@@ -163,19 +161,21 @@ export class RogueUI {
     }
 
     // Entrance stagger animation: add delay to each card
-    this.container.innerHTML = options.map((u, i) => {
-      const catIcon = CATEGORY_ICONS[u.category] || `[${u.category}]`;
-      const rarityColor = RARITY_COLORS[u.rarity] || '#888';
-      const delay = i * 0.08;
-      return `<div class="pick-card" data-id="${u.id}" style="--rarity-color: ${rarityColor}; --enter-delay: ${delay}s">
+    this.container.innerHTML = options
+      .map((u, i) => {
+        const catIcon = CATEGORY_ICONS[u.category] || `[${u.category}]`;
+        const rarityColor = RARITY_COLORS[u.rarity] || '#888';
+        const delay = i * 0.08;
+        return `<div class="pick-card" data-id="${u.id}" style="--rarity-color: ${rarityColor}; --enter-delay: ${delay}s">
         <div class="pick-rarity-bar" style="background: ${rarityColor}"></div>
         <div class="pick-category">${catIcon} ${u.rarity}</div>
         <div class="pick-name">${u.name}</div>
         <div class="pick-desc">${u.description}</div>
       </div>`;
-    }).join('');
+      })
+      .join('');
 
-    this.container.querySelectorAll('.pick-card').forEach(card => {
+    this.container.querySelectorAll('.pick-card').forEach((card) => {
       card.addEventListener('click', () => {
         const id = card.dataset.id;
         this.rogueRun.applyUpgrade(id);
@@ -229,11 +229,11 @@ export class RogueUI {
     if (!act || !floor) return;
 
     const TYPE_ICONS = {
-      table: '\u25C6',   // ◆
-      boss: '\u2605',    // ★
-      shop: '$',         // $
-      mystery: '?',      // ?
-      rest: '\u2665',    // ♥
+      table: '\u25C6', // ◆
+      boss: '\u2605', // ★
+      shop: '$', // $
+      mystery: '?', // ?
+      rest: '\u2665', // ♥
     };
 
     const visitedSet = new Set(visitedNodeIds || []);
@@ -244,20 +244,20 @@ export class RogueUI {
     if (this.mapFloorLabel) this.mapFloorLabel.textContent = floor.name;
 
     // Build node cards
-    this.mapNodes.innerHTML = nodes.map(node => {
-      const icon = TYPE_ICONS[node.type] || '?';
-      const visited = visitedSet.has(node.id);
-      const traitHTML = node.trait
-        ? `<span class="map-node-trait">${node.trait}</span>`
-        : '';
-      const targetHTML = (node.type === 'table' || node.type === 'boss') && node.target
-        ? `<span class="map-node-target">Target: ₡${node.target}</span>`
-        : '';
-      const npcHTML = node.npc
-        ? `<span class="map-node-npc">${node.type === 'shop' ? node.npc : 'vs ' + node.npc}</span>`
-        : '';
+    this.mapNodes.innerHTML = nodes
+      .map((node) => {
+        const icon = TYPE_ICONS[node.type] || '?';
+        const visited = visitedSet.has(node.id);
+        const traitHTML = node.trait ? `<span class="map-node-trait">${node.trait}</span>` : '';
+        const targetHTML =
+          (node.type === 'table' || node.type === 'boss') && node.target
+            ? `<span class="map-node-target">Target: ₡${node.target}</span>`
+            : '';
+        const npcHTML = node.npc
+          ? `<span class="map-node-npc">${node.type === 'shop' ? node.npc : 'vs ' + node.npc}</span>`
+          : '';
 
-      return `<div class="map-node type-${node.type} ${visited ? 'visited' : ''}" data-node-id="${node.id}">
+        return `<div class="map-node type-${node.type} ${visited ? 'visited' : ''}" data-node-id="${node.id}">
         <div class="map-node-header">
           <span class="map-node-icon">${icon}</span>
           <span class="map-node-name">${node.name}</span>
@@ -265,10 +265,11 @@ export class RogueUI {
         ${npcHTML}
         ${targetHTML || traitHTML ? `<div class="map-node-meta">${targetHTML}${traitHTML}</div>` : ''}
       </div>`;
-    }).join('');
+      })
+      .join('');
 
     // Attach click handlers for non-visited nodes
-    this.mapNodes.querySelectorAll('.map-node:not(.visited)').forEach(card => {
+    this.mapNodes.querySelectorAll('.map-node:not(.visited)').forEach((card) => {
       card.addEventListener('click', () => {
         const nodeId = card.dataset.nodeId;
         if (!nodeId) return;
@@ -312,11 +313,13 @@ export class RogueUI {
         <span>${data.xp} XP</span>
         <span>${data.availablePoints} point${data.availablePoints !== 1 ? 's' : ''}</span>
       </div>
-      ${PERKS.map(p => {
+      ${PERKS.map((p) => {
         const unlocked = data.unlockedPerks.includes(p.id);
-        const canBuy = data.availablePoints >= p.cost && !unlocked &&
+        const canBuy =
+          data.availablePoints >= p.cost &&
+          !unlocked &&
           (!p.prerequisite || data.unlockedPerks.includes(p.prerequisite));
-        return `<div class="perk-item ${unlocked ? 'unlocked' : ''}" data-id="${p.id}">
+        return `<div class="perk-item ${unlocked ? 'unlocked' : ''} ${canBuy ? 'purchasable' : ''}" data-id="${p.id}">
           <div class="perk-info">
             <div class="perk-name">${p.name}</div>
             <div class="perk-desc">${p.desc}</div>
@@ -326,7 +329,7 @@ export class RogueUI {
       }).join('')}
     `;
 
-    this.perkContainer.querySelectorAll('.perk-item:not(.unlocked)').forEach(item => {
+    this.perkContainer.querySelectorAll('.perk-item:not(.unlocked)').forEach((item) => {
       item.addEventListener('click', () => {
         const id = item.dataset.id;
         if (meta.unlockPerk(id)) {
@@ -353,7 +356,7 @@ export class RogueUI {
   showShop(npcId) {
     if (!this.shopOverlay || !this.shopSystem) return;
 
-    const npc = this.npcs.find(n => n.id === npcId);
+    const npc = this.npcs.find((n) => n.id === npcId);
     if (!npc) return;
 
     const trustLevel = this.shopSystem.getTrustLevel(npcId);
@@ -380,13 +383,13 @@ export class RogueUI {
 
     // Items
     if (this.shopItems) {
-      this.shopItems.innerHTML = inventory.map(item => {
-        const cost = this.shopSystem.getItemCost(item, tableTarget);
-        const canBuy = this.shopSystem.canAfford(this.rogueRun.game.money, item, tableTarget);
-        const buyClass = item.stubbed ? 'stubbed'
-          : canBuy ? '' : 'cant-afford';
+      this.shopItems.innerHTML = inventory
+        .map((item) => {
+          const cost = this.shopSystem.getItemCost(item, tableTarget);
+          const canBuy = this.shopSystem.canAfford(this.rogueRun.game.money, item, tableTarget);
+          const buyClass = item.stubbed ? 'stubbed' : canBuy ? '' : 'cant-afford';
 
-        return `<div class="shop-item" data-id="${item.id}" data-rarity="${item.rarity}">
+          return `<div class="shop-item" data-id="${item.id}" data-rarity="${item.rarity}">
           <div class="shop-item-info">
             <div class="shop-item-name">${item.name}</div>
             <div class="shop-item-desc">${item.desc}</div>
@@ -400,16 +403,19 @@ export class RogueUI {
             ${item.stubbed ? 'LOCKED' : canBuy ? 'Buy' : 'Expensive'}
           </button>
         </div>`;
-      }).join('');
+        })
+        .join('');
 
       // Attach buy handlers
-      this.shopItems.querySelectorAll('.shop-buy-btn:not(.cant-afford):not(.stubbed)').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const card = btn.closest('.shop-item');
-          const itemId = card.dataset.id;
-          this._handleBuy(itemId, npcId, btn);
+      this.shopItems
+        .querySelectorAll('.shop-buy-btn:not(.cant-afford):not(.stubbed)')
+        .forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const card = btn.closest('.shop-item');
+            const itemId = card.dataset.id;
+            this._handleBuy(itemId, npcId, btn);
+          });
         });
-      });
     }
 
     // Show overlay
@@ -468,13 +474,12 @@ export class RogueUI {
       const tableTarget = this.rogueRun.getCurrentTarget();
       const inventory = this.shopSystem.getInventory(npcId, tableTarget);
       const money = this.rogueRun.game.money;
-      this.shopItems.querySelectorAll('.shop-buy-btn').forEach(b => {
+      this.shopItems.querySelectorAll('.shop-buy-btn').forEach((b) => {
         const itemCard = b.closest('.shop-item');
         if (!itemCard) return;
         const iid = itemCard.dataset.id;
-        const item = inventory.find(i => i.id === iid);
+        const item = inventory.find((i) => i.id === iid);
         if (!item || b.classList.contains('bought')) return;
-        const cost = this.shopSystem.getItemCost(item, tableTarget);
         const canBuy = this.shopSystem.canAfford(money, item, tableTarget);
         if (!canBuy) {
           b.classList.add('cant-afford');
@@ -501,15 +506,16 @@ export class RogueUI {
     const slots = this.rogueRun.diceHandSlots;
     this._pickedSlots = [];
 
-    this.dicePickSlots.innerHTML = slots.map((s, i) => {
-      const def = s.type;
-      const cracked = s.durability === 0;
-      const maxDur = def ? def.durability : 1;
-      const pct = cracked ? 0 : Math.min((s.durability / maxDur) * 100, 100);
-      const durabClass = pct >= 60 ? 'high' : pct >= 30 ? 'medium' : 'low';
-      const delay = i * 0.08;
+    this.dicePickSlots.innerHTML = slots
+      .map((s, i) => {
+        const def = s.type;
+        const cracked = s.durability === 0;
+        const maxDur = def ? def.durability : 1;
+        const pct = cracked ? 0 : Math.min((s.durability / maxDur) * 100, 100);
+        const durabClass = pct >= 60 ? 'high' : pct >= 30 ? 'medium' : 'low';
+        const delay = i * 0.08;
 
-      return `<div class="dice-slot ${cracked ? 'cracked' : ''}" data-index="${i}" style="--enter-delay: ${delay}s">
+        return `<div class="dice-slot ${cracked ? 'cracked' : ''}" data-index="${i}" style="--enter-delay: ${delay}s">
         ${cracked ? '<span class="cracked-indicator">cracked</span>' : ''}
         <div class="dice-slot-emoji">🎲</div>
         <div class="dice-slot-type">${def ? def.name : '???'}</div>
@@ -519,18 +525,19 @@ export class RogueUI {
           </div>
           <span class="dice-slot-durability-label">${s.durability}/${maxDur}</span>
         </div>
-        <div class="dice-slot-effect">${cracked ? 'Cracked \u2014 no effect, 20% lose ₡1' : (def ? def.effect : '')}</div>
+        <div class="dice-slot-effect">${cracked ? 'Cracked \u2014 no effect, 20% lose ₡1' : def ? def.effect : ''}</div>
       </div>`;
-    }).join('');
+      })
+      .join('');
 
     // Attach click handlers for pick/unpick
-    this.dicePickSlots.querySelectorAll('.dice-slot:not(.cracked)').forEach(card => {
+    this.dicePickSlots.querySelectorAll('.dice-slot:not(.cracked)').forEach((card) => {
       card.addEventListener('click', () => {
         const idx = parseInt(card.dataset.index, 10);
         if (card.classList.contains('picked')) {
           // Unpick
           card.classList.remove('picked');
-          this._pickedSlots = this._pickedSlots.filter(i => i !== idx);
+          this._pickedSlots = this._pickedSlots.filter((i) => i !== idx);
         } else if (this._pickedSlots.length < 2) {
           // Pick
           card.classList.add('picked');
@@ -576,15 +583,16 @@ export class RogueUI {
     const header = this.dicePickOverlay.querySelector('.pick-header');
     if (header) header.textContent = 'Lock 2 Dice for This Table';
 
-    this.dicePickSlots.innerHTML = slots.map((s, i) => {
-      const def = s.type;
-      const cracked = s.durability === 0;
-      const maxDur = def ? def.durability : 1;
-      const pct = cracked ? 0 : Math.min((s.durability / maxDur) * 100, 100);
-      const durabClass = pct >= 60 ? 'high' : pct >= 30 ? 'medium' : 'low';
-      const delay = i * 0.08;
+    this.dicePickSlots.innerHTML = slots
+      .map((s, i) => {
+        const def = s.type;
+        const cracked = s.durability === 0;
+        const maxDur = def ? def.durability : 1;
+        const pct = cracked ? 0 : Math.min((s.durability / maxDur) * 100, 100);
+        const durabClass = pct >= 60 ? 'high' : pct >= 30 ? 'medium' : 'low';
+        const delay = i * 0.08;
 
-      return `<div class="dice-slot ${cracked ? 'cracked' : ''}" data-index="${i}" style="--enter-delay: ${delay}s">
+        return `<div class="dice-slot ${cracked ? 'cracked' : ''}" data-index="${i}" style="--enter-delay: ${delay}s">
         ${cracked ? '<span class="cracked-indicator">⚠ cracked</span>' : ''}
         <div class="dice-slot-emoji">🎲</div>
         <div class="dice-slot-type">${def ? def.name : '???'}</div>
@@ -594,18 +602,19 @@ export class RogueUI {
           </div>
           <span class="dice-slot-durability-label">${s.durability}/${maxDur}</span>
         </div>
-        <div class="dice-slot-effect">${cracked ? 'Cracked — 20% lose ₡1' : (def ? def.effect : '')}</div>
+        <div class="dice-slot-effect">${cracked ? 'Cracked — 20% lose ₡1' : def ? def.effect : ''}</div>
       </div>`;
-    }).join('');
+      })
+      .join('');
 
     // Attach click handlers for pick/unpick (all slots, including cracked)
-    this.dicePickSlots.querySelectorAll('.dice-slot').forEach(card => {
+    this.dicePickSlots.querySelectorAll('.dice-slot').forEach((card) => {
       card.addEventListener('click', () => {
         const idx = parseInt(card.dataset.index, 10);
         if (card.classList.contains('picked')) {
           // Unpick
           card.classList.remove('picked');
-          this._pickedSlots = this._pickedSlots.filter(i => i !== idx);
+          this._pickedSlots = this._pickedSlots.filter((i) => i !== idx);
         } else if (this._pickedSlots.length < 2) {
           // Pick
           card.classList.add('picked');
@@ -616,9 +625,10 @@ export class RogueUI {
           this.dicePickConfirm.disabled = this._pickedSlots.length !== 2;
         }
         if (this.dicePickConfirm) {
-          this.dicePickConfirm.textContent = this._pickedSlots.length === 2
-            ? 'Lock These Dice'
-            : `Pick ${2 - this._pickedSlots.length} More`;
+          this.dicePickConfirm.textContent =
+            this._pickedSlots.length === 2
+              ? 'Lock These Dice'
+              : `Pick ${2 - this._pickedSlots.length} More`;
         }
       });
     });
@@ -687,12 +697,14 @@ export class RogueUI {
     }).join('');
 
     // Attach click handlers for vow selection
-    this.vowSelectCards.querySelectorAll('.vow-card').forEach(card => {
+    this.vowSelectCards.querySelectorAll('.vow-card').forEach((card) => {
       card.addEventListener('click', () => {
         const vowId = card.dataset.id;
         if (meta.setVow(vowId)) {
           // Add selected styling before hiding
-          this.vowSelectCards.querySelectorAll('.vow-card').forEach(c => c.classList.remove('selected'));
+          this.vowSelectCards
+            .querySelectorAll('.vow-card')
+            .forEach((c) => c.classList.remove('selected'));
           card.classList.add('selected');
           setTimeout(() => {
             this.hideVowSelect();
@@ -857,9 +869,11 @@ export class RogueUI {
         ${summary.winCount}W / ${summary.lossCount}L
         ${summary.tablesCleared > 0 ? `&bull; ${summary.tablesCleared} table${summary.tablesCleared > 1 ? 's' : ''}` : ''}
       </p>
-      ${summary.upgrades.length > 0
-        ? `<p class="run-upgrades-line">${summary.upgrades.join(' \u00b7 ')}</p>`
-        : ''}
+      ${
+        summary.upgrades.length > 0
+          ? `<p class="run-upgrades-line">${summary.upgrades.join(' \u00b7 ')}</p>`
+          : ''
+      }
       <p class="run-final">finished with ₡${summary.finalMoney}</p>
       ${this._xpHTML()}
       <button id="new-game-btn">new run</button>
@@ -885,12 +899,16 @@ export class RogueUI {
         ${summary.winCount}W / ${summary.lossCount}L
         ${summary.tablesCleared > 0 ? `&bull; ${summary.tablesCleared} table${summary.tablesCleared > 1 ? 's' : ''}` : ''}
       </p>
-      ${summary.sidePot > 0
-        ? `<p class="run-pot-payout" style="color: #4caf50">side pot x2: +₡${summary.bonusPot}</p>`
-        : ''}
-      ${summary.upgrades.length > 0
-        ? `<p class="run-upgrades-line">${summary.upgrades.join(' \u00b7 ')}</p>`
-        : ''}
+      ${
+        summary.sidePot > 0
+          ? `<p class="run-pot-payout" style="color: #4caf50">side pot x2: +₡${summary.bonusPot}</p>`
+          : ''
+      }
+      ${
+        summary.upgrades.length > 0
+          ? `<p class="run-upgrades-line">${summary.upgrades.join(' \u00b7 ')}</p>`
+          : ''
+      }
       <p class="run-final" style="color: #ffd700">final: ₡${summary.finalMoney}</p>
       ${this._xpHTML()}
       <button id="new-game-btn">new run</button>
@@ -918,7 +936,7 @@ export class RogueUI {
   hideGameOver() {
     document.getElementById('game-over').classList.remove('visible');
     // Remove level-up banners
-    document.querySelectorAll('.level-up-banner').forEach(el => el.remove());
+    document.querySelectorAll('.level-up-banner').forEach((el) => el.remove());
   }
 
   // ─── INTERNALS ───────────────────────────────────────
@@ -932,7 +950,12 @@ export class RogueUI {
     const meta = this.rogueRun.meta;
     if (!meta) return;
     const summary = this.rogueRun.getRunSummary();
-    const xp = meta.recordRun(summary.finalMoney, won, summary.tablesCleared, summary.upgrades.length);
+    const xp = meta.recordRun(
+      summary.finalMoney,
+      won,
+      summary.tablesCleared,
+      summary.upgrades.length,
+    );
     const result = meta.addXP(xp);
     if (result.leveledUp) {
       // Store for display after the screen renders

@@ -8,21 +8,26 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RGBShiftShader } from 'three/addons/shaders/RGBShiftShader.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import { createWorld, createDieBody, isSettled, hoverDie, launchDie } from './physics.js';
-import { createDie, getTopFace, updateDieType, consumeDieDurability, getDieType, isDieCracked, setupDieAnimations, updateAllDiceAnimations, registerDieAnimation, unregisterDieAnimation } from './dice.js';
+import {
+  createDie,
+  getTopFace,
+  updateDieType,
+  setupDieAnimations,
+  updateAllDiceAnimations,
+  unregisterDieAnimation,
+} from './dice.js';
 import { RogueRun } from './rogue-run.js';
 import { RogueUI } from './rogue-ui.js';
-import { MetaProgress } from './meta-progress.js';
+import { MetaProgress, SETTLE_TIMEOUT } from './meta-progress.js';
 import { ShopSystem } from './shop.js';
 import { UI } from './ui.js';
 import { AudioManager } from './audio.js';
 import { callAnnouncement, callDead } from './announcer.js';
 import { NPC_DEFS } from './npcs.js';
 import { Pot } from './pot.js';
-import { MAP_ACTS } from './map.js';
 
 // ==== CONSTANTS ====
 const SETTLE_FRAMES = 50;
-const SETTLE_TIMEOUT = 3000;
 
 // ==== SCENE SETUP ====
 const scene = new THREE.Scene();
@@ -130,7 +135,12 @@ for (const x of [-7, 7]) {
     const z = curbPos.getZ(i);
     if (Math.abs(z) > 0.05) {
       const d = (Math.random() - 0.5) * 0.03;
-      curbPos.setXYZ(i, curbPos.getX(i) + (Math.random() - 0.5) * 0.02, curbPos.getY(i) + (Math.random() - 0.5) * 0.02, z + d);
+      curbPos.setXYZ(
+        i,
+        curbPos.getX(i) + (Math.random() - 0.5) * 0.02,
+        curbPos.getY(i) + (Math.random() - 0.5) * 0.02,
+        z + d,
+      );
     }
   }
   curbPos.needsUpdate = true;
@@ -206,7 +216,9 @@ function createWallTexture() {
     ctx.fillRect(x, y, 3 + Math.random() * 6, 3 + Math.random() * 6);
   }
 
-  const bh = 24, bw = 48, gap = 3;
+  const bh = 24,
+    bw = 48,
+    gap = 3;
   for (let row = 0; row < Math.ceil(c.height / (bh + gap)); row++) {
     for (let col = 0; col < Math.ceil(c.width / (bw + gap)) + 1; col++) {
       const offsetX = row % 2 === 0 ? 0 : (bw + gap) / 2;
@@ -274,6 +286,18 @@ const HOVER_Y = 3;
 const HOVER_Z = 3.3;
 const BET_CHIPS = [1, 2, 5, 10, 20];
 
+/** Position both dice at their hover spots. If bobAmt is provided, adds sinusoidal bob animation. */
+function positionDiceHover(diceArray, bobAmt = 0) {
+  diceArray.forEach((d, i) => {
+    if (d.body.position.y < 0.5) return;
+    const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
+    const bob = bobAmt !== 0 ? Math.sin(bobAmt + i * 1.5) * 0.06 : 0;
+    d.body.position.set(x, HOVER_Y + bob, HOVER_Z);
+    d.body.velocity.set(0, 0, 0);
+    d.body.angularVelocity.set(0, 0, 0);
+  });
+}
+
 const audio = new AudioManager();
 
 // ==== GAME STATE ====
@@ -287,8 +311,16 @@ const game = rogueRun.game;
 // Initialize dice with typeIds from starting hand
 const startingSlots = rogueRun.diceHandSlots;
 const dice = [
-  { mesh: createDie(startingSlots[0]?.typeId || 'house_bones'), body: createDieBody(), hitWall: false },
-  { mesh: createDie(startingSlots[1]?.typeId || 'house_bones'), body: createDieBody(), hitWall: false },
+  {
+    mesh: createDie(startingSlots[0]?.typeId || 'house_bones'),
+    body: createDieBody(),
+    hitWall: false,
+  },
+  {
+    mesh: createDie(startingSlots[1]?.typeId || 'house_bones'),
+    body: createDieBody(),
+    hitWall: false,
+  },
 ];
 
 dice.forEach((d, i) => {
@@ -378,24 +410,31 @@ scene.add(aimLine);
 
 function makeTargetSprite() {
   const c = document.createElement('canvas');
-  c.width = 64; c.height = 64;
+  c.width = 64;
+  c.height = 64;
   const ctx = c.getContext('2d');
   ctx.strokeStyle = 'rgba(255,215,0,0.8)';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.moveTo(32, 4); ctx.lineTo(32, 26);
-  ctx.moveTo(32, 38); ctx.lineTo(32, 60);
-  ctx.moveTo(4, 32); ctx.lineTo(26, 32);
-  ctx.moveTo(38, 32); ctx.lineTo(60, 32);
+  ctx.moveTo(32, 4);
+  ctx.lineTo(32, 26);
+  ctx.moveTo(32, 38);
+  ctx.lineTo(32, 60);
+  ctx.moveTo(4, 32);
+  ctx.lineTo(26, 32);
+  ctx.moveTo(38, 32);
+  ctx.lineTo(60, 32);
   ctx.stroke();
   ctx.beginPath();
   ctx.arc(32, 32, 10, 0, Math.PI * 2);
   ctx.stroke();
-  return new THREE.Sprite(new THREE.SpriteMaterial({
-    map: new THREE.CanvasTexture(c),
-    transparent: true,
-    depthTest: false,
-  }));
+  return new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(c),
+      transparent: true,
+      depthTest: false,
+    }),
+  );
 }
 const targetSprite = makeTargetSprite();
 targetSprite.scale.set(0.5, 0.5, 1);
@@ -461,11 +500,7 @@ function aimThrow() {
     d.hitWall = false;
     const side = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
     d.body.position.set(side, HOVER_Y, HOVER_Z);
-    launchDie(d.body,
-      dirX * speed + (i === 0 ? -0.3 : 0.3),
-      vy,
-      dirZ * speed
-    );
+    launchDie(d.body, dirX * speed + (i === 0 ? -0.3 : 0.3), vy, dirZ * speed);
   });
 
   settleCount = 0;
@@ -547,7 +582,7 @@ function animate(time) {
 
   world.step(1 / 60, 1 / 60, 3);
 
-  dice.forEach(d => {
+  dice.forEach((d) => {
     d.mesh.position.copy(d.body.position);
     d.mesh.quaternion.copy(d.body.quaternion);
   });
@@ -564,58 +599,41 @@ function animate(time) {
   if (rogueRun.runState === 'MAP_NAV' && Date.now() >= rogueRun._mapNavBlockedUntil) {
     if (!rogueUI._mapVisible) {
       const mapData = rogueRun.startMap();
-      rogueUI.showMap(mapData.actIndex, mapData.floorIndex, mapData.nodes, [...rogueRun.visitedNodes]);
+      rogueUI.showMap(mapData.actIndex, mapData.floorIndex, mapData.nodes, [
+        ...rogueRun.visitedNodes,
+      ]);
     }
     // Keep dice hovering during map (same as idle hover)
     hoverBob += 0.04;
-    dice.forEach((d, i) => {
-      if (d.body.position.y < 0.5) return;
-      const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
-      const bob = Math.sin(hoverBob + i * 1.5) * 0.06;
-      d.body.position.set(x, HOVER_Y + bob, HOVER_Z);
-      d.body.velocity.set(0, 0, 0);
-      d.body.angularVelocity.set(0, 0, 0);
-    });
+    positionDiceHover(dice, hoverBob);
   } else if (isAiming) {
-    dice.forEach((d, i) => {
-      const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
-      d.body.position.set(x, HOVER_Y, HOVER_Z);
-      d.body.velocity.set(0, 0, 0);
-      d.body.angularVelocity.set(0, 0, 0);
-    });
-  } else if (!game.rolling && !game.bankrupt && !resultPending) {
+    positionDiceHover(dice);
+  } else if (!game.rolling && !rogueRun.isBust && !resultPending) {
     hoverBob += 0.04;
-    dice.forEach((d, i) => {
-      if (d.body.position.y < 0.5) return;
-      const x = i === 0 ? -DICE_OFFSET : DICE_OFFSET;
-      const bob = Math.sin(hoverBob + i * 1.5) * 0.06;
-      d.body.position.set(x, HOVER_Y + bob, HOVER_Z);
-      d.body.velocity.set(0, 0, 0);
-      d.body.angularVelocity.set(0, 0, 0);
-    });
+    positionDiceHover(dice, hoverBob);
   }
 
   if (game.rolling && !resultPending) {
     const elapsed = Date.now() - rollStartTime;
-    const almostStill = elapsed > SETTLE_TIMEOUT && dice.every(d =>
-      d.body.velocity.length() < 0.3 && d.body.angularVelocity.length() < 0.3
-    );
+    const almostStill =
+      elapsed > SETTLE_TIMEOUT &&
+      dice.every((d) => d.body.velocity.length() < 0.3 && d.body.angularVelocity.length() < 0.3);
     if (almostStill) {
-      dice.forEach(d => {
+      dice.forEach((d) => {
         d.body.velocity.set(0, 0, 0);
         d.body.angularVelocity.set(0, 0, 0);
       });
       settleCount = SETTLE_FRAMES;
     }
 
-    const allSettled = dice.every(d => isSettled(d.body));
+    const allSettled = dice.every((d) => isSettled(d.body));
     if (allSettled) {
       settleCount++;
       if (settleCount >= SETTLE_FRAMES) {
         settleCount = 0;
         resultPending = true;
 
-        const allHitWall = dice.every(d => d.hitWall);
+        const allHitWall = dice.every((d) => d.hitWall);
         if (!allHitWall) {
           game.deadThrow();
           rogueRun.runState = 'BETTING';
@@ -625,7 +643,7 @@ function animate(time) {
           ui.sync();
           rogueUI.sync();
         } else {
-          const values = dice.map(d => getTopFace(d.mesh));
+          const values = dice.map((d) => getTopFace(d.mesh));
           const [d1, d2] = values;
           const sum = d1 + d2;
           const currentPoint = game.point;
@@ -656,9 +674,7 @@ function animate(time) {
           const resolveData = { result, netChange };
 
           setTimeout(() => {
-            const basePayout = result === 'win' ? game.bet * 2
-              : result === 'push' ? game.bet
-              : 0;
+            const basePayout = result === 'win' ? game.bet * 2 : result === 'push' ? game.bet : 0;
             ui.showResultCard(resolveData.result, game.bet, basePayout, [], resolveData.netChange);
 
             setTimeout(() => {

@@ -54,11 +54,36 @@ function createPipTexture(pipCount) {
 
   const positions = {
     1: [[0, 0]],
-    2: [[-o, -o], [o, o]],
-    3: [[-o, -o], [0, 0], [o, o]],
-    4: [[-o, -o], [o, -o], [-o, o], [o, o]],
-    5: [[-o, -o], [o, -o], [0, 0], [-o, o], [o, o]],
-    6: [[-o - 14, -o], [o + 14, -o], [-o - 14, 0], [o + 14, 0], [-o - 14, o], [o + 14, o]],
+    2: [
+      [-o, -o],
+      [o, o],
+    ],
+    3: [
+      [-o, -o],
+      [0, 0],
+      [o, o],
+    ],
+    4: [
+      [-o, -o],
+      [o, -o],
+      [-o, o],
+      [o, o],
+    ],
+    5: [
+      [-o, -o],
+      [o, -o],
+      [0, 0],
+      [-o, o],
+      [o, o],
+    ],
+    6: [
+      [-o - 14, -o],
+      [o + 14, -o],
+      [-o - 14, 0],
+      [o + 14, 0],
+      [-o - 14, o],
+      [o + 14, o],
+    ],
   };
 
   ctx.shadowColor = 'rgba(0,0,0,0.25)';
@@ -103,47 +128,6 @@ function createTextTexture(text, fgColor, bgColor) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, size / 2, size / 2);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.anisotropy = 4;
-  return texture;
-}
-
-/**
- * Generate a skull texture for the Doom d20.
- * @returns {THREE.CanvasTexture}
- */
-function createSkullTexture() {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, 0, size, size);
-
-  // Skull shape
-  ctx.fillStyle = '#ddd';
-  // Cranium
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2 - 20, 50, Math.PI, 0);
-  ctx.fill();
-  // Jaw
-  ctx.fillRect(size / 2 - 35, size / 2 - 5, 70, 45);
-  // Eyes
-  ctx.fillStyle = '#1a1a1a';
-  ctx.beginPath();
-  ctx.arc(size / 2 - 18, size / 2 - 15, 12, 0, Math.PI * 2);
-  ctx.arc(size / 2 + 18, size / 2 - 15, 12, 0, Math.PI * 2);
-  ctx.fill();
-  // Nose
-  ctx.beginPath();
-  ctx.moveTo(size / 2, size / 2 + 5);
-  ctx.lineTo(size / 2 - 8, size / 2 + 18);
-  ctx.lineTo(size / 2 + 8, size / 2 + 18);
-  ctx.closePath();
-  ctx.fill();
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.anisotropy = 4;
@@ -215,63 +199,6 @@ function createWitnessTexture() {
 }
 
 /**
- * Generate fire gradient texture for Pyre.
- * @returns {THREE.CanvasTexture}
- */
-function createFireGradientTexture() {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  const gradient = ctx.createRadialGradient(size / 2, size / 2, 10, size / 2, size / 2, size / 2);
-  gradient.addColorStop(0, '#ffffff');
-  gradient.addColorStop(0.2, '#ffff00');
-  gradient.addColorStop(0.5, '#ff8800');
-  gradient.addColorStop(0.8, '#ff2200');
-  gradient.addColorStop(1, '#330000');
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, size, size);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.anisotropy = 4;
-  return texture;
-}
-
-/**
- * Generate scratch-mark texture for Vengeance.
- * @returns {THREE.CanvasTexture}
- */
-function createScratchTexture() {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#d4c5a9';
-  ctx.fillRect(0, 0, size, size);
-
-  ctx.strokeStyle = '#3a3020';
-  ctx.lineWidth = 2;
-  for (let i = 0; i < 12; i++) {
-    const x1 = Math.random() * size;
-    const y1 = Math.random() * size;
-    const x2 = x1 + (Math.random() - 0.5) * 80;
-    const y2 = y1 + (Math.random() - 0.5) * 80;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.anisotropy = 4;
-  return texture;
-}
-
-/**
  * Face value ordering for the 6 RoundedBoxGeometry materials.
  * @type {number[]}
  */
@@ -281,18 +208,90 @@ const FACE_VALUES = [1, 6, 2, 5, 3, 4];
 
 /** Per-type material configuration */
 const TYPE_TINTS = {
-  house_bones: { color: 0xf5f0e6, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.7, metalness: 0 },
-  witness:     { color: 0xf5f0e6, emissive: 0x224488, emissiveIntensity: 0.1, roughness: 0.15, metalness: 0.6 },
-  glass:       { color: 0xaaddff, emissive: 0x44ccff, emissiveIntensity: 0.1, roughness: 0.05, metalness: 0 },
-  volatile:    { color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 0.5, roughness: 0.2, metalness: 0 },
-  cursed_13:   { color: 0x1a0a2e, emissive: 0x220044, emissiveIntensity: 0.15, roughness: 0.2, metalness: 0.1 },
-  loaded_set:  { color: 0xcd7f32, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.3, metalness: 0.6 },
-  snake_eyes:  { color: 0x00ff88, emissive: 0x003311, emissiveIntensity: 0.08, roughness: 0.25, metalness: 0.1 },
-  doom:        { color: 0x333333, emissive: 0xff0000, emissiveIntensity: 0.15, roughness: 0.3, metalness: 0.5 },
-  debt:        { color: 0xffd700, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.2, metalness: 0.8 },
-  vengeance:   { color: 0xd4c5a9, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.5, metalness: 0.05 },
-  pyre:        { color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 1.2, roughness: 0.1, metalness: 0 },
-  split:       { color: 0x4488ff, emissive: 0x000000, emissiveIntensity: 0, roughness: 0.35, metalness: 0.1 },
+  house_bones: {
+    color: 0xf5f0e6,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    roughness: 0.7,
+    metalness: 0,
+  },
+  witness: {
+    color: 0xf5f0e6,
+    emissive: 0x224488,
+    emissiveIntensity: 0.1,
+    roughness: 0.15,
+    metalness: 0.6,
+  },
+  glass: {
+    color: 0xaaddff,
+    emissive: 0x44ccff,
+    emissiveIntensity: 0.1,
+    roughness: 0.05,
+    metalness: 0,
+  },
+  volatile: {
+    color: 0xff4400,
+    emissive: 0xff2200,
+    emissiveIntensity: 0.5,
+    roughness: 0.2,
+    metalness: 0,
+  },
+  cursed_13: {
+    color: 0x1a0a2e,
+    emissive: 0x220044,
+    emissiveIntensity: 0.15,
+    roughness: 0.2,
+    metalness: 0.1,
+  },
+  loaded_set: {
+    color: 0xcd7f32,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    roughness: 0.3,
+    metalness: 0.6,
+  },
+  snake_eyes: {
+    color: 0x00ff88,
+    emissive: 0x003311,
+    emissiveIntensity: 0.08,
+    roughness: 0.25,
+    metalness: 0.1,
+  },
+  doom: {
+    color: 0x333333,
+    emissive: 0xff0000,
+    emissiveIntensity: 0.15,
+    roughness: 0.3,
+    metalness: 0.5,
+  },
+  debt: {
+    color: 0xffd700,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    roughness: 0.2,
+    metalness: 0.8,
+  },
+  vengeance: {
+    color: 0xd4c5a9,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    roughness: 0.5,
+    metalness: 0.05,
+  },
+  pyre: {
+    color: 0xff6600,
+    emissive: 0xff4400,
+    emissiveIntensity: 1.2,
+    roughness: 0.1,
+    metalness: 0,
+  },
+  split: {
+    color: 0x4488ff,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    roughness: 0.35,
+    metalness: 0.1,
+  },
 };
 
 // ========== CRACKED CONSTANTS ==============================================
@@ -316,7 +315,7 @@ function applyTint(material, tint) {
 }
 
 function applyCrackedVisual(mesh) {
-  const wireframe = mesh.children.find(c => c.isLineSegments);
+  const wireframe = mesh.children.find((c) => c.isLineSegments);
   if (wireframe) {
     wireframe.material.color.setHex(CRACKED_WIRE_COLOR);
     wireframe.material.opacity = 1;
@@ -354,8 +353,16 @@ function extractFaceNormals(geo) {
   } else {
     for (let i = 0; i < positions.count; i += 9) {
       const a = new THREE.Vector3(positions.getX(i), positions.getY(i), positions.getZ(i));
-      const b = new THREE.Vector3(positions.getX(i + 3), positions.getY(i + 3), positions.getZ(i + 3));
-      const c = new THREE.Vector3(positions.getX(i + 6), positions.getY(i + 6), positions.getZ(i + 6));
+      const b = new THREE.Vector3(
+        positions.getX(i + 3),
+        positions.getY(i + 3),
+        positions.getZ(i + 3),
+      );
+      const c = new THREE.Vector3(
+        positions.getX(i + 6),
+        positions.getY(i + 6),
+        positions.getZ(i + 6),
+      );
       const normal = new THREE.Vector3();
       normal.crossVectors(b.clone().sub(a), c.clone().sub(a)).normalize();
       normals.push(normal);
@@ -381,11 +388,14 @@ function buildCyclicFaceValues(faceCount) {
  * @returns {THREE.Mesh}
  */
 function createCubeDie(typeId) {
-  const materials = FACE_VALUES.map(v => new THREE.MeshStandardMaterial({
-    map: createPipTexture(v),
-    roughness: 0.35,
-    metalness: 0.05,
-  }));
+  const materials = FACE_VALUES.map(
+    (v) =>
+      new THREE.MeshStandardMaterial({
+        map: createPipTexture(v),
+        roughness: 0.35,
+        metalness: 0.05,
+      }),
+  );
 
   const geo = new RoundedBoxGeometry(1, 1, 1, 2, 0.08);
   const mesh = new THREE.Mesh(geo, materials);
@@ -437,9 +447,12 @@ function createWitnessDie() {
   const faceValues = [];
   // 6 face regions based on which axis component is largest
   const axes = [
-    new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
-    new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
-    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+    new THREE.Vector3(1, 0, 0),
+    new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 1, 0),
+    new THREE.Vector3(0, -1, 0),
+    new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(0, 0, -1),
   ];
   for (let i = 0; i < axes.length; i++) {
     faceNormals.push({ normal: axes[i].clone() });
@@ -492,7 +505,11 @@ function createIcosahedronDie(typeId) {
   // Wireframe
   const edges = new THREE.EdgesGeometry(geo);
   const edgeColor = typeId === 'doom' ? 0xff0000 : typeId === 'volatile' ? 0xff6600 : 0x222222;
-  const lineMat = new THREE.LineBasicMaterial({ color: edgeColor, transparent: true, opacity: 0.4 });
+  const lineMat = new THREE.LineBasicMaterial({
+    color: edgeColor,
+    transparent: true,
+    opacity: 0.4,
+  });
   mesh.add(new THREE.LineSegments(edges, lineMat));
 
   // Extract face normals from geometry
@@ -501,11 +518,11 @@ function createIcosahedronDie(typeId) {
   const uniqueNormals = [];
   for (const n of geoNormals) {
     const key = `${n.x.toFixed(3)},${n.y.toFixed(3)},${n.z.toFixed(3)}`;
-    if (!uniqueNormals.find(u => u.key === key)) {
+    if (!uniqueNormals.find((u) => u.key === key)) {
       uniqueNormals.push({ normal: n.clone(), key });
     }
   }
-  mesh.userData.faceNormals = uniqueNormals.map(u => ({ normal: u.normal }));
+  mesh.userData.faceNormals = uniqueNormals.map((u) => ({ normal: u.normal }));
   mesh.userData.faceValues = buildCyclicFaceValues(uniqueNormals.length);
 
   // Glass auto-cracks: shift tint to red when durability is low
@@ -630,108 +647,6 @@ function createDebtDie() {
 }
 
 /**
- * Create a knucklebone-style die (Vengeance — displaced icosahedron).
- * @returns {THREE.Mesh}
- */
-function createVengeanceDie() {
-  const baseGeo = new THREE.IcosahedronGeometry(0.4, 1);
-  const positions = baseGeo.attributes.position;
-
-  // Random vertex displacement for organic irregular look
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i);
-    const y = positions.getY(i);
-    const z = positions.getZ(i);
-    const len = Math.sqrt(x * x + y * y + z * z);
-    if (len > 0.01) {
-      const displacement = 1 + (Math.random() - 0.5) * 0.25;
-      positions.setXYZ(i, x * displacement, y * displacement, z * displacement);
-    }
-  }
-  positions.needsUpdate = true;
-  baseGeo.computeVertexNormals();
-
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xd4c5a9,
-    roughness: 0.5,
-    metalness: 0.05,
-    map: createScratchTexture(),
-  });
-  const mesh = new THREE.Mesh(baseGeo, mat);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-
-  const edges = new THREE.EdgesGeometry(baseGeo);
-  const lineMat = new THREE.LineBasicMaterial({ color: 0x5a4030, transparent: true, opacity: 0.3 });
-  mesh.add(new THREE.LineSegments(edges, lineMat));
-
-  const geoNormals = extractFaceNormals(baseGeo);
-  const uniqueNormals = [];
-  for (const n of geoNormals) {
-    const key = `${n.x.toFixed(3)},${n.y.toFixed(3)},${n.z.toFixed(3)}`;
-    if (!uniqueNormals.find(u => u.key === key)) {
-      uniqueNormals.push({ normal: n.clone(), key });
-    }
-  }
-  mesh.userData.faceNormals = uniqueNormals.map(u => ({ normal: u.normal }));
-  mesh.userData.faceValues = buildCyclicFaceValues(uniqueNormals.length);
-  mesh.userData._vengeanceGlow = 0;
-
-  return mesh;
-}
-
-/**
- * Create a fire particle die (Pyre — icosahedron with orbiting embers).
- * @returns {THREE.Mesh}
- */
-function createPyreDie() {
-  const geo = new THREE.IcosahedronGeometry(0.5, 1);
-  const mat = new THREE.MeshStandardMaterial({
-    map: createFireGradientTexture(),
-    roughness: 0.1,
-    metalness: 0,
-  });
-  mat.emissive.setHex(0xff4400);
-  mat.emissiveIntensity = 1.2;
-
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-
-  // Particle ember system
-  const particleCount = 10;
-  const particles = new THREE.Group();
-  for (let i = 0; i < particleCount; i++) {
-    const pGeo = new THREE.SphereGeometry(0.03, 4, 4);
-    const pMat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0xff4400 });
-    const particle = new THREE.Mesh(pGeo, pMat);
-    const angle = (i / particleCount) * Math.PI * 2;
-    particle.position.set(Math.cos(angle) * 0.6, (Math.random() - 0.5) * 0.3, Math.sin(angle) * 0.6);
-    particle.userData._angle = angle;
-    particle.userData._speed = 0.5 + Math.random() * 1.5;
-    particle.userData._radius = 0.5 + Math.random() * 0.3;
-    particle.userData._life = Math.random();
-    particles.add(particle);
-  }
-  mesh.add(particles);
-  mesh.userData._pyreParticles = particles;
-  mesh.userData._pyreTime = 0;
-
-  const geoNormals = extractFaceNormals(geo);
-  const uniqueNormals = [];
-  for (const n of geoNormals) {
-    const key = `${n.x.toFixed(3)},${n.y.toFixed(3)},${n.z.toFixed(3)}`;
-    if (!uniqueNormals.find(u => u.key === key)) {
-      uniqueNormals.push({ normal: n.clone(), key });
-    }
-  }
-  mesh.userData.faceNormals = uniqueNormals.map(u => ({ normal: u.normal }));
-  mesh.userData.faceValues = buildCyclicFaceValues(uniqueNormals.length);
-
-  return mesh;
-}
-
-/**
  * Create linked split pair die (two small cubes connected by bar).
  * @returns {THREE.Group}
  */
@@ -740,16 +655,22 @@ function createSplitDie() {
 
   const halfSize = 0.45;
   const geo = new RoundedBoxGeometry(halfSize, halfSize, halfSize, 2, 0.06);
-  const materialsA = FACE_VALUES.map(v => new THREE.MeshStandardMaterial({
-    map: createPipTexture(v),
-    roughness: 0.35,
-    metalness: 0.05,
-  }));
-  const materialsB = FACE_VALUES.map(v => new THREE.MeshStandardMaterial({
-    map: createPipTexture(v),
-    roughness: 0.35,
-    metalness: 0.05,
-  }));
+  const materialsA = FACE_VALUES.map(
+    (v) =>
+      new THREE.MeshStandardMaterial({
+        map: createPipTexture(v),
+        roughness: 0.35,
+        metalness: 0.05,
+      }),
+  );
+  const materialsB = FACE_VALUES.map(
+    (v) =>
+      new THREE.MeshStandardMaterial({
+        map: createPipTexture(v),
+        roughness: 0.35,
+        metalness: 0.05,
+      }),
+  );
 
   // Left die (blue tint)
   const leftDie = new THREE.Mesh(geo, materialsA);
@@ -777,14 +698,18 @@ function createSplitDie() {
 
   // Connecting bar
   const barGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8);
-  const barMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.3, metalness: 0.7 });
+  const barMat = new THREE.MeshStandardMaterial({
+    color: 0x888888,
+    roughness: 0.3,
+    metalness: 0.7,
+  });
   const bar = new THREE.Mesh(barGeo, barMat);
   bar.rotation.z = Math.PI / 2;
   bar.castShadow = true;
   group.add(bar);
 
   // Wireframes
-  [leftDie, rightDie].forEach(die => {
+  [leftDie, rightDie].forEach((die) => {
     const edges = new THREE.EdgesGeometry(die.geometry);
     const lineMat = new THREE.LineBasicMaterial({ color: 0x444444 });
     die.add(new THREE.LineSegments(edges, lineMat));
@@ -873,7 +798,7 @@ export function createDie(typeId = 'house_bones') {
   // Apply per-type visual tint to all materials
   const tint = getTint(typeId);
   const materials = [];
-  mesh.traverse(child => {
+  mesh.traverse((child) => {
     if (child.material) {
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       for (const mat of mats) {
@@ -907,7 +832,7 @@ export function registerDieAnimation(mesh, updateFn) {
  * @param {THREE.Object3D} mesh
  */
 export function unregisterDieAnimation(mesh) {
-  const idx = _animatedDice.findIndex(e => e.mesh === mesh);
+  const idx = _animatedDice.findIndex((e) => e.mesh === mesh);
   if (idx !== -1) _animatedDice.splice(idx, 1);
 }
 
@@ -917,7 +842,11 @@ export function unregisterDieAnimation(mesh) {
  */
 export function updateAllDiceAnimations(deltaTime) {
   for (const entry of _animatedDice) {
-    try { entry.updateFn(deltaTime); } catch (e) { /* ignore per-die errors */ }
+    try {
+      entry.updateFn(deltaTime);
+    } catch {
+      /* ignore per-die errors */
+    }
   }
 }
 
@@ -1000,7 +929,7 @@ export function updateDieType(mesh, typeId, durability) {
   mesh.userData.durability = durability != null ? durability : typeDef.durability;
 
   const tint = getTint(typeId);
-  mesh.traverse(child => {
+  mesh.traverse((child) => {
     if (child.material) {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       for (const mat of materials) {
@@ -1105,7 +1034,7 @@ export function setupDieAnimations(mesh, typeId) {
       break;
 
     case 'debt':
-      registerDieAnimation(mesh, (dt) => {
+      registerDieAnimation(mesh, () => {
         const offset = mesh.userData._jitterOffset || 0;
         for (const child of mesh.children) {
           if (child.isMesh && child.geometry.type === 'CylinderGeometry') {

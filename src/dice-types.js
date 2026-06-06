@@ -1,8 +1,8 @@
 /**
  * dice-types.js — Die type catalog and DiceHand state machine for crapser
  *
- * Defines 12 die types across 4 categories (safe, calculated_risk, gambling, 
- * build_around), each with durability tracking and a cracked state. The DiceHand 
+ * Defines 12 die types across 4 categories (safe, calculated_risk, gambling,
+ * build_around), each with durability tracking and a cracked state. The DiceHand
  * class manages a 4-slot hand with locked slots for table-scope dice locking.
  *
  * @module dice-types
@@ -122,7 +122,7 @@ export const DICE_TYPES = [
  */
 export const crackedEffect = {
   description: 'No special effect, 20% chance lose ₡1',
-  loseChance: 0.20,
+  loseChance: 0.2,
   loseAmount: 1,
 };
 
@@ -135,7 +135,7 @@ export const crackedEffect = {
  * @returns {object|null} the die type definition, or null if not found
  */
 export function getDieType(id) {
-  return DICE_TYPES.find(t => t.id === id) || null;
+  return DICE_TYPES.find((t) => t.id === id) || null;
 }
 
 /**
@@ -157,7 +157,7 @@ export function isCracked(die) {
  * @returns {string[]} array of 4 die type ids
  */
 export function getStartingHand() {
-  const nonSafe = DICE_TYPES.filter(t => t.category !== 'safe');
+  const nonSafe = DICE_TYPES.filter((t) => t.category !== 'safe');
   const r1 = nonSafe[Math.floor(Math.random() * nonSafe.length)];
   const r2 = nonSafe[Math.floor(Math.random() * nonSafe.length)];
   return ['house_bones', 'witness', r1.id, r2.id];
@@ -189,12 +189,11 @@ export class DiceHand {
    * @param {string[]} types — array of 4 die type ids
    */
   reset(types) {
-
     /**
      * Array of 4 slot objects.
      * @type {Array<{typeId: string, durability: number, picked: boolean}>}
      */
-    this.slots = types.map(id => {
+    this.slots = types.map((id) => {
       const def = getDieType(id);
       return {
         typeId: id,
@@ -294,18 +293,18 @@ export class DiceHand {
   pickSlot(index) {
     if (index < 0 || index >= this.slots.length) return false;
 
-    const alreadyPicked = this.slots.filter(s => s.picked).length;
+    const alreadyPicked = this.slots.filter((s) => s.picked).length;
     if (alreadyPicked >= 2) return false;
 
     // Auto-pick locked slots first if they aren't picked yet
     for (const lockedIdx of this.lockedSlots) {
-      if (!this.slots[lockedIdx].picked && this.slots.filter(s => s.picked).length < 2) {
+      if (!this.slots[lockedIdx].picked && this.slots.filter((s) => s.picked).length < 2) {
         this.slots[lockedIdx].picked = true;
       }
     }
 
     // If we now have 2 picked, reject the manual pick unless it was a locked slot
-    const nowPicked = this.slots.filter(s => s.picked).length;
+    const nowPicked = this.slots.filter((s) => s.picked).length;
     if (nowPicked >= 2) return this.lockedSlots.has(index) && this.slots[index].picked;
 
     this.slots[index].picked = true;
@@ -318,8 +317,8 @@ export class DiceHand {
    */
   get pickedDice() {
     return this.slots
-      .filter(s => s.picked)
-      .map(s => {
+      .filter((s) => s.picked)
+      .map((s) => {
         const def = getDieType(s.typeId);
         return def ? { ...def, durability: s.durability } : null;
       })
@@ -338,7 +337,7 @@ export class DiceHand {
         if (this.lockedSlots.has(i)) return -1;
         return i;
       })
-      .filter(i => i !== -1);
+      .filter((i) => i !== -1);
   }
 
   /**
@@ -372,7 +371,7 @@ export class DiceHand {
    * @returns {boolean} true if the die still has durability remaining, false if it just cracked or was already cracked
    */
   consumeDurability(dieIndex) {
-    const picked = this.slots.filter(s => s.picked);
+    const picked = this.slots.filter((s) => s.picked);
     if (dieIndex < 0 || dieIndex >= picked.length) return false;
 
     picked[dieIndex].durability = Math.max(0, picked[dieIndex].durability - 1);

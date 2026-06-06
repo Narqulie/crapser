@@ -14,14 +14,56 @@ const STORAGE_KEY = 'crapser_meta';
 const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000];
 
 export const PERKS = [
-  { id: 'starter_boost', name: 'Starter Boost',    desc: 'Start each run with +₡2',        cost: 1, prerequisite: null },
-  { id: 'fat_stacks',    name: 'Fat Stacks',        desc: 'Start each run with +₡5',        cost: 2, prerequisite: 'starter_boost' },
-  { id: 'reroll_basic',  name: 'Mulligan',           desc: '1 reroll token per run',         cost: 1, prerequisite: null },
-  { id: 'reroll_master', name: 'Double Mulligan',    desc: '2 reroll tokens per run',        cost: 2, prerequisite: 'reroll_basic' },
-  { id: 'extra_choice',  name: 'More Options',       desc: 'Pick from 4 upgrades instead of 3', cost: 2, prerequisite: null },
-  { id: 'interest',      name: 'Street Interest',    desc: '+₡1 per hand played (passive)',   cost: 1, prerequisite: null },
-  { id: 'first_free',    name: 'First Pick Free',    desc: 'First upgrade each run is free', cost: 2, prerequisite: null },
-  { id: 'xp_boost',      name: 'Quick Learner',      desc: '2x XP gain',                     cost: 1, prerequisite: null },
+  {
+    id: 'starter_boost',
+    name: 'Starter Boost',
+    desc: 'Start each run with +₡2',
+    cost: 1,
+    prerequisite: null,
+  },
+  {
+    id: 'fat_stacks',
+    name: 'Fat Stacks',
+    desc: 'Start each run with +₡5',
+    cost: 2,
+    prerequisite: 'starter_boost',
+  },
+  {
+    id: 'reroll_basic',
+    name: 'Mulligan',
+    desc: '1 reroll token per run',
+    cost: 1,
+    prerequisite: null,
+  },
+  {
+    id: 'reroll_master',
+    name: 'Double Mulligan',
+    desc: '2 reroll tokens per run',
+    cost: 2,
+    prerequisite: 'reroll_basic',
+  },
+  {
+    id: 'extra_choice',
+    name: 'More Options',
+    desc: 'Pick from 4 upgrades instead of 3',
+    cost: 2,
+    prerequisite: null,
+  },
+  {
+    id: 'interest',
+    name: 'Street Interest',
+    desc: '+₡1 per hand played (passive)',
+    cost: 1,
+    prerequisite: null,
+  },
+  {
+    id: 'first_free',
+    name: 'First Pick Free',
+    desc: 'First upgrade each run is free',
+    cost: 2,
+    prerequisite: null,
+  },
+  { id: 'xp_boost', name: 'Quick Learner', desc: '2x XP gain', cost: 1, prerequisite: null },
 ];
 
 // ─── VOW DEFS (DIFFICULTY MODIFIERS) ────────────────────────
@@ -76,7 +118,7 @@ function getDefaultData() {
     totalTablesCleared: 0,
     unlockedPerks: [],
     availablePoints: 0,
-    activeVow: null,        // id of the active difficulty vow (null = no vow)
+    activeVow: null, // id of the active difficulty vow (null = no vow)
     npcTrust: {},
   };
 }
@@ -160,7 +202,7 @@ export class MetaProgress {
   unlockPerk(perkId) {
     if (this.data.availablePoints <= 0) return false;
     if (this.data.unlockedPerks.includes(perkId)) return false;
-    const perk = PERKS.find(p => p.id === perkId);
+    const perk = PERKS.find((p) => p.id === perkId);
     if (!perk) return false;
     if (perk.prerequisite && !this.data.unlockedPerks.includes(perk.prerequisite)) return false;
     this.data.availablePoints--;
@@ -177,8 +219,8 @@ export class MetaProgress {
   /** Get bonuses to apply at run start */
   getBonuses() {
     return {
-      startingMoney: (this.hasPerk('fat_stacks') ? 5 : this.hasPerk('starter_boost') ? 2 : 0),
-      rerollTokens: (this.hasPerk('reroll_master') ? 2 : this.hasPerk('reroll_basic') ? 1 : 0),
+      startingMoney: this.hasPerk('fat_stacks') ? 5 : this.hasPerk('starter_boost') ? 2 : 0,
+      rerollTokens: this.hasPerk('reroll_master') ? 2 : this.hasPerk('reroll_basic') ? 1 : 0,
       extraPick: this.hasPerk('extra_choice') ? 1 : 0,
       interestPerHand: this.hasPerk('interest') ? 1 : 0,
       firstFree: this.hasPerk('first_free') ? 1 : 0,
@@ -211,7 +253,7 @@ export class MetaProgress {
    */
   getVow() {
     if (!this.data.activeVow) return null;
-    return VOW_DEFS.find(v => v.id === this.data.activeVow) || null;
+    return VOW_DEFS.find((v) => v.id === this.data.activeVow) || null;
   }
 
   /** Clear the active vow so the next run has no vow modifier */

@@ -42,9 +42,9 @@ const BILL_DENOMS = [20, 10, 5, 2, 1];
 const BILL_COLORS = {
   20: '#4a7c59',
   10: '#4a7cb5',
-  5:  '#7a4a8a',
-  2:  '#c97d3a',
-  1:  '#8b4513',
+  5: '#7a4a8a',
+  2: '#c97d3a',
+  1: '#8b4513',
 };
 
 // ========== DIMENSIONS ==========
@@ -123,7 +123,7 @@ function makeBillTexture(denom) {
   ctx.fillText(`₡${denom}`, 100, 48);
   ctx.font = '14px sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.fillText(denom >= 10 ? 'GOLD' : (denom >= 5 ? 'BIG' : 'CASH'), 100, 82);
+  ctx.fillText(denom >= 10 ? 'GOLD' : denom >= 5 ? 'BIG' : 'CASH', 100, 82);
   return new THREE.CanvasTexture(c);
 }
 
@@ -151,16 +151,25 @@ export class Pot {
     this.world = world;
 
     // Contact materials: pot↔pot, pot↔ground, die↔pot
-    world.addContactMaterial(new CANNON.ContactMaterial(potMat, potMat, {
-      friction: 0.3, restitution: 0.05,
-    }));
+    world.addContactMaterial(
+      new CANNON.ContactMaterial(potMat, potMat, {
+        friction: 0.3,
+        restitution: 0.05,
+      }),
+    );
     const groundMat = groundBody.material;
-    world.addContactMaterial(new CANNON.ContactMaterial(potMat, groundMat, {
-      friction: 0.5, restitution: 0.05,
-    }));
-    world.addContactMaterial(new CANNON.ContactMaterial(dieMat, potMat, {
-      friction: 0.5, restitution: 0.05,
-    }));
+    world.addContactMaterial(
+      new CANNON.ContactMaterial(potMat, groundMat, {
+        friction: 0.5,
+        restitution: 0.05,
+      }),
+    );
+    world.addContactMaterial(
+      new CANNON.ContactMaterial(dieMat, potMat, {
+        friction: 0.5,
+        restitution: 0.05,
+      }),
+    );
 
     /** @type {{mesh: THREE.Mesh, body: CANNON.Body}[]} */
     this.bills = [];
@@ -178,7 +187,9 @@ export class Pot {
     // Shared materials (cloned per bill so each can have its own texture)
     this.billMat = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.0 });
     this.coinMat = new THREE.MeshStandardMaterial({
-      color: 0xffd700, metalness: 0.7, roughness: 0.3,
+      color: 0xffd700,
+      metalness: 0.7,
+      roughness: 0.3,
     });
   }
 
@@ -279,8 +290,10 @@ export class Pot {
     this.group.add(mesh);
 
     const body = new CANNON.Body({
-      mass: 0.5, material: potMat,
-      linearDamping: 0.5, angularDamping: 0.5,
+      mass: 0.5,
+      material: potMat,
+      linearDamping: 0.5,
+      angularDamping: 0.5,
     });
     body.addShape(new CANNON.Box(new CANNON.Vec3(BILL_W / 2, BILL_T / 2, BILL_H / 2)));
     body.position.set(x, SPAWN_Y + yOff, z);
@@ -317,8 +330,10 @@ export class Pot {
     this.group.add(mesh);
 
     const body = new CANNON.Body({
-      mass: 0.5, material: potMat,
-      linearDamping: 0.5, angularDamping: 0.5,
+      mass: 0.5,
+      material: potMat,
+      linearDamping: 0.5,
+      angularDamping: 0.5,
     });
     body.addShape(new CANNON.Cylinder(COIN_R, COIN_R, COIN_H, 12));
     body.position.set(x, SPAWN_Y + 0.05 + yOff, z);
@@ -340,7 +355,8 @@ export class Pot {
   _updateLabel() {
     if (!this.labelSprite) this._createLabel();
     const ctx = this._labelCtx;
-    const w = 512, h = 128;
+    const w = 512,
+      h = 128;
     ctx.clearRect(0, 0, w, h);
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     ctx.beginPath();

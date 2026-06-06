@@ -39,11 +39,30 @@ const COMBOS = {
   '3,4': ['Up Pops the Devil', 'Up Jumped the Devil', 'Six Ace'],
   '2,6': ['Easy Eight'],
   '3,5': ['Easy Eight'],
-  '4,4': ['Eighter from Decatur', 'Square Pair', 'Ozzie and Harriet', 'Mom and Dad', 'Ada from Decatur'],
+  '4,4': [
+    'Eighter from Decatur',
+    'Square Pair',
+    'Ozzie and Harriet',
+    'Mom and Dad',
+    'Ada from Decatur',
+  ],
   '3,6': ['Nine', 'Niner from Carolina', 'Old Mike'],
-  '4,5': ['Jesse James', 'Nina from Pasadena', 'Nina at the Marina', 'Centerfield Nine', 'Railroad Nine'],
+  '4,5': [
+    'Jesse James',
+    'Nina from Pasadena',
+    'Nina at the Marina',
+    'Centerfield Nine',
+    'Railroad Nine',
+  ],
   '4,6': ['Easy Ten'],
-  '5,5': ['Big Dick', 'Big Dick from Boston', 'Dos Equis', 'Puppy Paws', 'Big John', 'Pair of Sunflowers'],
+  '5,5': [
+    'Big Dick',
+    'Big Dick from Boston',
+    'Dos Equis',
+    'Puppy Paws',
+    'Big John',
+    'Pair of Sunflowers',
+  ],
   '5,6': ['Yo-leven', 'Yo', 'Six Five No Jive'],
   '6,6': ['Boxcars', 'Midnight', 'Double-action Field Traction', '12 Craps 12'],
 };
@@ -60,12 +79,28 @@ const COMBOS = {
  * @constant {Object<string, string[]>}
  */
 const CONTEXT_CALLS = {
-  comeout_win:   ['Front line winner!', 'Pay the line!', 'Winner, winner!', 'Take the money!', 'Right bettors get paid!'],
+  comeout_win: [
+    'Front line winner!',
+    'Pay the line!',
+    'Winner, winner!',
+    'Take the money!',
+    'Right bettors get paid!',
+  ],
   comeout_craps: ['Craps!', 'Better luck, shooter!', "Don't bettors take the money!"],
-  point_set:     ['Point is on!', 'We got a point!', 'And the betting opens!'],
-  point_made:    ['Made the point!', "That's a winner!", 'Pay the line!', 'Money for the right bettors!'],
-  seven_out:     ['Seven out!', "That's a loser!", "Take the don'ts!", 'Dice are coming through!'],
-  dead:          ['No roll!', "Didn't reach the back wall!", 'Gotta hit the wall, shooter!', 'Dead throw, try again!'],
+  point_set: ['Point is on!', 'We got a point!', 'And the betting opens!'],
+  point_made: [
+    'Made the point!',
+    "That's a winner!",
+    'Pay the line!',
+    'Money for the right bettors!',
+  ],
+  seven_out: ['Seven out!', "That's a loser!", "Take the don'ts!", 'Dice are coming through!'],
+  dead: [
+    'No roll!',
+    "Didn't reach the back wall!",
+    'Gotta hit the wall, shooter!',
+    'Dead throw, try again!',
+  ],
 };
 
 // ========== PUBLIC API ==========

@@ -1,8 +1,9 @@
 import { getActiveSynergies } from './upgrades.js';
 
 const RULES_TEXT = {
-  'COME_OUT': `come-out: <em class="num-win">7</em> or <em class="num-win">11</em> wins &bull; <em class="num-loss">2</em>,<em class="num-loss">3</em>,<em class="num-loss">12</em> loses &bull; anything else sets the point`,
-  'POINT': (p) => `point is <em class="num-point">${p}</em>: roll <em class="num-point">${p}</em> to win &bull; <em class="num-loss">7</em> loses (seven out)`,
+  COME_OUT: `come-out: <em class="num-win">7</em> or <em class="num-win">11</em> wins &bull; <em class="num-loss">2</em>,<em class="num-loss">3</em>,<em class="num-loss">12</em> loses &bull; anything else sets the point`,
+  POINT: (p) =>
+    `point is <em class="num-point">${p}</em>: roll <em class="num-point">${p}</em> to win &bull; <em class="num-loss">7</em> loses (seven out)`,
 };
 
 const HISTORY_COLORS = {
@@ -58,7 +59,7 @@ export class UI {
 
     this.newGameBtn.addEventListener('click', () => this.onNewGame?.());
 
-    this.betChips.forEach(chip => {
+    this.betChips.forEach((chip) => {
       chip.addEventListener('click', () => {
         this.game.setBet(parseInt(chip.dataset.amount));
         this.sync();
@@ -83,7 +84,10 @@ export class UI {
     else if (type === 'point') el.classList.add('announce-point');
     else if (type === 'dead') el.classList.add('announce-dead');
     clearTimeout(this._resultTimeout);
-    this._resultTimeout = setTimeout(() => { el.className = ''; el.textContent = ''; }, 1500);
+    this._resultTimeout = setTimeout(() => {
+      el.className = '';
+      el.textContent = '';
+    }, 1500);
   }
 
   /** Show the game-over overlay. */
@@ -115,13 +119,20 @@ export class UI {
       this.historyEl.innerHTML = '';
       return;
     }
-    this.historyEl.innerHTML = entries.map(e => {
-      const color = HISTORY_COLORS[e.result] || '#333';
-      const label = e.sum === 2 ? '2\u2605' :
-        e.sum === 3 ? '3\u2605' :
-        e.sum === 12 ? '12\u2605' : `${e.sum}`;
-      return `<div class="hist-entry" style="background:${color}" title="${e.values[0]}+${e.values[1]}=${e.sum}">${label}</div>`;
-    }).join('');
+    this.historyEl.innerHTML = entries
+      .map((e) => {
+        const color = HISTORY_COLORS[e.result] || '#333';
+        const label =
+          e.sum === 2
+            ? '2\u2605'
+            : e.sum === 3
+              ? '3\u2605'
+              : e.sum === 12
+                ? '12\u2605'
+                : `${e.sum}`;
+        return `<div class="hist-entry" style="background:${color}" title="${e.values[0]}+${e.values[1]}=${e.sum}">${label}</div>`;
+      })
+      .join('');
   }
 
   /**
@@ -158,9 +169,8 @@ export class UI {
     if (!this.resultCard || !this.resultCardInner) return;
 
     const absNet = Math.abs(netChange);
-    const headerText = result === 'win' ? `WIN +₡${absNet}` :
-      result === 'loss' ? `LOSS -₡${absNet}` :
-      `PUSH ₡0`;
+    const headerText =
+      result === 'win' ? `WIN +₡${absNet}` : result === 'loss' ? `LOSS -₡${absNet}` : `PUSH ₡0`;
     this.resultHeader.textContent = headerText;
     this.resultHeader.className = 'result-header';
 
@@ -174,7 +184,7 @@ export class UI {
     }
 
     if (bonuses && bonuses.length > 0) {
-      bonuses.forEach(b => {
+      bonuses.forEach((b) => {
         breakdownHtml += `<div class="result-item"><span class="label">${b.name}</span><span class="value positive">+₡${b.amount}</span></div>`;
       });
     }
@@ -232,8 +242,7 @@ export class UI {
 
     // Derive synergy data from rogueRun if not explicitly provided
     if (!synergyData && this.rogueRun) {
-      synergyData = this.rogueRun._synergies
-        || getActiveSynergies(this.rogueRun.activeUpgrades);
+      synergyData = this.rogueRun._synergies || getActiveSynergies(this.rogueRun.activeUpgrades);
     }
 
     if (!upgrades || upgrades.length === 0) {
@@ -254,23 +263,27 @@ export class UI {
     }
 
     // Render upgrade tags (existing style + anti-synergy indicators)
-    const tagsHtml = upgrades.map(u => {
-      const chargeText = u.charges > 0 ? ` <span class="charge">x${u.charges}</span>` : '';
-      const antiWarn = antiIds.has(u.id)
-        ? ' <span class="anti-warn" title="Anti-synergy active">\u26A0</span>'
-        : '';
-      return `<span class="bonus-tag ${u.category}">${u.name}${chargeText}${antiWarn}</span>`;
-    }).join('');
+    const tagsHtml = upgrades
+      .map((u) => {
+        const chargeText = u.charges > 0 ? ` <span class="charge">x${u.charges}</span>` : '';
+        const antiWarn = antiIds.has(u.id)
+          ? ' <span class="anti-warn" title="Anti-synergy active">\u26A0</span>'
+          : '';
+        return `<span class="bonus-tag ${u.category}">${u.name}${chargeText}${antiWarn}</span>`;
+      })
+      .join('');
 
     // Render synergy set badges
     const categoryIcons = { dice: '\u25C6', bet: '\u25C6', charm: '\u2726', talent: '\u25C6' };
     let synergyHtml = '';
     if (synergyData && synergyData.synergies && synergyData.synergies.length > 0) {
-      synergyHtml = synergyData.synergies.map(s => {
-        const icon = categoryIcons[s.category] || '\u25C6';
-        const label = s.tier === 'set3' ? '3-set' : '2-set';
-        return `<span class="synergy-badge ${s.category} ${s.tier}" title="${s.description}">${icon} ${label}</span>`;
-      }).join('');
+      synergyHtml = synergyData.synergies
+        .map((s) => {
+          const icon = categoryIcons[s.category] || '\u25C6';
+          const label = s.tier === 'set3' ? '3-set' : '2-set';
+          return `<span class="synergy-badge ${s.category} ${s.tier}" title="${s.description}">${icon} ${label}</span>`;
+        })
+        .join('');
     }
 
     // Render legendary badge
@@ -300,7 +313,7 @@ export class UI {
     this.phaseEl.textContent = g.phase === 'POINT' ? `\u25CF POINT ${g.point} \u25CF` : 'COME OUT';
     this.phaseEl.className = g.phase === 'POINT' ? 'phase-point' : 'phase-comeout';
     const msgEl = document.getElementById('game-message');
-    if (msgEl) msgEl.textContent = g.rolling ? 'rolling\u2026' : (g.message || '');
+    if (msgEl) msgEl.textContent = g.rolling ? 'rolling\u2026' : g.message || '';
     this.pointEl.textContent = '';
 
     // Triple-bar money display
@@ -308,10 +321,11 @@ export class UI {
     if (this.betValue) this.betValue.textContent = `₡${this.game.bet}`;
     if (this.payoutValue) this.payoutValue.textContent = `₡${this.calculatePayout()}`;
 
-    this.betChips.forEach(chip => {
+    this.betChips.forEach((chip) => {
       const val = parseInt(chip.dataset.amount);
       chip.classList.toggle('active', val === this.game.bet);
-      chip.disabled = this.game.rolling || this.game.phase === 'POINT' || val < (this.game.minBet || 5);
+      chip.disabled =
+        this.game.rolling || this.game.phase === 'POINT' || val < (this.game.minBet || 5);
     });
 
     this.rollCountEl.textContent = `rolls: ${this.game.rollCount}`;
@@ -320,7 +334,7 @@ export class UI {
     this.syncRules();
     this.syncHistory();
 
-    if (this.game.bankrupt) {
+    if (this.rogueRun.isBust) {
       this.showGameOver();
     }
   }

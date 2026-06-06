@@ -56,15 +56,19 @@ export function createWorld() {
 
   const groundMat = new CANNON.Material('ground');
 
-  world.addContactMaterial(new CANNON.ContactMaterial(dieMat, groundMat, {
-    friction: 0.4,
-    restitution: 0.35,
-  }));
+  world.addContactMaterial(
+    new CANNON.ContactMaterial(dieMat, groundMat, {
+      friction: 0.4,
+      restitution: 0.35,
+    }),
+  );
 
-  world.addContactMaterial(new CANNON.ContactMaterial(dieMat, dieMat, {
-    friction: 0.3,
-    restitution: 0.25,
-  }));
+  world.addContactMaterial(
+    new CANNON.ContactMaterial(dieMat, dieMat, {
+      friction: 0.3,
+      restitution: 0.25,
+    }),
+  );
 
   const groundShape = new CANNON.Plane();
   const groundBody = new CANNON.Body({ mass: 0, material: groundMat });
@@ -115,8 +119,7 @@ export function createDieBody() {
  * @returns {boolean} `true` if the body is effectively at rest.
  */
 export function isSettled(body) {
-  return body.velocity.length() < V_THRESHOLD
-    && body.angularVelocity.length() < V_THRESHOLD;
+  return body.velocity.length() < V_THRESHOLD && body.angularVelocity.length() < V_THRESHOLD;
 }
 
 // ========== DIE MOVEMENT HELPERS ==========

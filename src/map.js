@@ -45,7 +45,8 @@ export const NODE_TYPES = {
   boss: {
     label: 'Boss',
     icon: '\u2694\uFE0F', // crossed swords
-    description: 'Boss table — higher stakes with a unique trait. Clearing it advances to the next act.',
+    description:
+      'Boss table — higher stakes with a unique trait. Clearing it advances to the next act.',
     hasGame: true,
     hasTarget: true,
     isBoss: true,
@@ -98,70 +99,201 @@ export const NODE_TYPES = {
  */
 export const MAP_ACTS = [
   {
-    id: 'act_1', name: 'The Back Alleys', floors: [
+    id: 'act_1',
+    name: 'The Back Alleys',
+    floors: [
       {
-        id: 'floor_1_1', name: 'Dive Bar District', nodes: [
-          { id: 'alley_mike', type: 'table', name: "Mike's Back Alley", npc: 'mike', target: 30, trait: null },
-          { id: 'alley_sal', type: 'table', name: "Sal's Side Game", npc: 'sal', target: 40, minBet: 2, trait: null },
+        id: 'floor_1_1',
+        name: 'Dive Bar District',
+        nodes: [
+          {
+            id: 'alley_mike',
+            type: 'table',
+            name: "Mike's Back Alley",
+            npc: 'mike',
+            target: 30,
+            trait: null,
+          },
+          {
+            id: 'alley_sal',
+            type: 'table',
+            name: "Sal's Side Game",
+            npc: 'sal',
+            target: 40,
+            minBet: 2,
+            trait: null,
+          },
           { id: 'alley_mystery', type: 'mystery', name: 'Lucky Break' },
         ],
       },
       {
-        id: 'floor_1_2', name: 'Warehouse Row', nodes: [
-          { id: 'alley_diane', type: 'table', name: "Diane's Table", npc: 'diane', target: 40, minBet: 3, trait: null },
+        id: 'floor_1_2',
+        name: 'Warehouse Row',
+        nodes: [
+          {
+            id: 'alley_diane',
+            type: 'table',
+            name: "Diane's Table",
+            npc: 'diane',
+            target: 40,
+            minBet: 3,
+            trait: null,
+          },
           { id: 'alley_nick', type: 'shop', name: "Nick's Bargain Bin", npc: 'nick' },
-          { id: 'alley_ruth', type: 'table', name: "Ruth's Back Room", npc: 'ruth', target: 50, trait: 'slippery' },
+          {
+            id: 'alley_ruth',
+            type: 'table',
+            name: "Ruth's Back Room",
+            npc: 'ruth',
+            target: 50,
+            trait: 'slippery',
+          },
         ],
       },
       {
-        id: 'floor_1_3', name: 'The Vault', nodes: [
-          { id: 'alley_boss', type: 'boss', name: 'The Vault Keeper', npc: 'ruth', target: 70, trait: 'boss' },
+        id: 'floor_1_3',
+        name: 'The Vault',
+        nodes: [
+          {
+            id: 'alley_boss',
+            type: 'boss',
+            name: 'The Vault Keeper',
+            npc: 'ruth',
+            target: 70,
+            trait: 'boss',
+          },
         ],
       },
     ],
   },
   {
-    id: 'act_2', name: 'The Underground', floors: [
+    id: 'act_2',
+    name: 'The Underground',
+    floors: [
       {
-        id: 'floor_2_1', name: 'Smoke-Filled Dens', nodes: [
-          { id: 'ug_mike', type: 'table', name: "Mike's High Stakes", npc: 'mike', target: 60, minBet: 5, trait: null },
-          { id: 'ug_sal', type: 'table', name: "Sal's Rigged Setup", npc: 'sal', target: 70, minBet: 5, trait: 'crooked' },
+        id: 'floor_2_1',
+        name: 'Smoke-Filled Dens',
+        nodes: [
+          {
+            id: 'ug_mike',
+            type: 'table',
+            name: "Mike's High Stakes",
+            npc: 'mike',
+            target: 60,
+            minBet: 5,
+            trait: null,
+          },
+          {
+            id: 'ug_sal',
+            type: 'table',
+            name: "Sal's Rigged Setup",
+            npc: 'sal',
+            target: 70,
+            minBet: 5,
+            trait: 'crooked',
+          },
           { id: 'ug_rest', type: 'rest', name: 'Back Room Breather' },
         ],
       },
       {
-        id: 'floor_2_2', name: 'The Switch', nodes: [
+        id: 'floor_2_2',
+        name: 'The Switch',
+        nodes: [
           { id: 'ug_diane', type: 'shop', name: "Diane's Dice Emporium", npc: 'diane' },
-          { id: 'ug_larry', type: 'table', name: "Larry's Loan Game", npc: 'larry', target: 80, minBet: 6, trait: null },
+          {
+            id: 'ug_larry',
+            type: 'table',
+            name: "Larry's Loan Game",
+            npc: 'larry',
+            target: 80,
+            minBet: 6,
+            trait: null,
+          },
           { id: 'ug_mystery', type: 'mystery', name: 'Whisper in the Dark' },
         ],
       },
       {
-        id: 'floor_2_3', name: 'Deep Below', nodes: [
-          { id: 'ug_boss', type: 'boss', name: 'The Pit Boss', npc: 'mike', target: 100, trait: 'boss' },
+        id: 'floor_2_3',
+        name: 'Deep Below',
+        nodes: [
+          {
+            id: 'ug_boss',
+            type: 'boss',
+            name: 'The Pit Boss',
+            npc: 'mike',
+            target: 100,
+            trait: 'boss',
+          },
         ],
       },
     ],
   },
   {
-    id: 'act_3', name: 'The House', floors: [
+    id: 'act_3',
+    name: 'The House',
+    floors: [
       {
-        id: 'floor_3_1', name: 'Marble Halls', nodes: [
-          { id: 'house_sal', type: 'table', name: "Sal's Final Table", npc: 'sal', target: 100, minBet: 8, trait: null },
+        id: 'floor_3_1',
+        name: 'Marble Halls',
+        nodes: [
+          {
+            id: 'house_sal',
+            type: 'table',
+            name: "Sal's Final Table",
+            npc: 'sal',
+            target: 100,
+            minBet: 8,
+            trait: null,
+          },
           { id: 'house_mystery', type: 'mystery', name: 'The Vault Key' },
-          { id: 'house_diane', type: 'table', name: "Diane's Last Stand", npc: 'diane', target: 120, minBet: 10, trait: 'slippery' },
+          {
+            id: 'house_diane',
+            type: 'table',
+            name: "Diane's Last Stand",
+            npc: 'diane',
+            target: 120,
+            minBet: 10,
+            trait: 'slippery',
+          },
         ],
       },
       {
-        id: 'floor_3_2', name: 'Velvet Ropes', nodes: [
+        id: 'floor_3_2',
+        name: 'Velvet Ropes',
+        nodes: [
           { id: 'house_larry', type: 'shop', name: "Larry's Final Goods", npc: 'larry' },
-          { id: 'house_mike', type: 'table', name: "Mike's All-In", npc: 'mike', target: 140, minBet: 12, trait: 'crooked' },
-          { id: 'house_ruth', type: 'table', name: "Ruth's Insurance Policy", npc: 'ruth', target: 160, minBet: 15, trait: 'high_stakes' },
+          {
+            id: 'house_mike',
+            type: 'table',
+            name: "Mike's All-In",
+            npc: 'mike',
+            target: 140,
+            minBet: 12,
+            trait: 'crooked',
+          },
+          {
+            id: 'house_ruth',
+            type: 'table',
+            name: "Ruth's Insurance Policy",
+            npc: 'ruth',
+            target: 160,
+            minBet: 15,
+            trait: 'high_stakes',
+          },
         ],
       },
       {
-        id: 'floor_3_3', name: 'The Penthouse', nodes: [
-          { id: 'house_boss', type: 'boss', name: 'The House', npc: 'ruth', target: 200, trait: 'boss' },
+        id: 'floor_3_3',
+        name: 'The Penthouse',
+        nodes: [
+          {
+            id: 'house_boss',
+            type: 'boss',
+            name: 'The House',
+            npc: 'ruth',
+            target: 200,
+            trait: 'boss',
+          },
         ],
       },
     ],
@@ -181,7 +313,7 @@ export const MAP_ACTS = [
 export function getNode(mapActs, nodeId) {
   for (const act of mapActs) {
     for (const floor of act.floors) {
-      const node = floor.nodes.find(n => n.id === nodeId);
+      const node = floor.nodes.find((n) => n.id === nodeId);
       if (node) return node;
     }
   }
@@ -225,7 +357,7 @@ export function getNextFloors(mapActs, currentActIndex, currentFloorIndex) {
   if (!floor) return null;
 
   // Stay on current floor if any node is unvisited
-  const allVisited = floor.nodes.every(n => n.visited);
+  const allVisited = floor.nodes.every((n) => n.visited);
   if (!allVisited) {
     return { actIndex: currentActIndex, floorIndex: currentFloorIndex };
   }

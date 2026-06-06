@@ -139,7 +139,7 @@ export class AudioManager {
     const t = this.ctx.currentTime;
     const osc = this.ctx.createOscillator();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(523, t);   // C5
+    osc.frequency.setValueAtTime(523, t); // C5
     osc.frequency.setValueAtTime(659, t + 0.08); // E5
     osc.frequency.setValueAtTime(784, t + 0.16); // G5
     const gain = this.ctx.createGain();

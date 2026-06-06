@@ -3,15 +3,9 @@
  *
  * Manages 6 NPC vendors (Mike, Sal, Diane, Larry, Ruth, Nick) each with unique
  * shop inventories. Items span 6 categories: one_shot, counter, passive, charges,
- * dice, and immediate. The trust system tracks total money spent per NPC across runs
- * (persisted via MetaProgress), unlocking higher rarities and granting discounts at
- * 5 trust tiers (Stranger → Family).
- *
- * Dice-category items replace dice in the player's DiceHand rather than going into
- * the activeUpgrades Map.
- *
- * @module shop
  */
+
+import { shuffle } from './utils.js';
 
 import { UPGRADES } from './upgrades.js';
 
@@ -24,11 +18,35 @@ import { UPGRADES } from './upgrades.js';
  * @type {Array<{level: number, name: string, threshold: number, discount: number, unlocks: string[]}>}
  */
 const TRUST_TABLE = [
-  { level: 1, name: 'Stranger', threshold: 0,    discount: 0,    unlocks: ['common', 'uncommon'] },
-  { level: 2, name: 'Regular',  threshold: 20,   discount: 0.10, unlocks: ['common', 'uncommon', 'rare'] },
-  { level: 3, name: 'Friend',   threshold: 100,  discount: 0.15, unlocks: ['common', 'uncommon', 'rare'] },
-  { level: 4, name: 'Partner',  threshold: 300,  discount: 0.20, unlocks: ['common', 'uncommon', 'rare', 'epic'] },
-  { level: 5, name: 'Family',   threshold: 1000, discount: 0.30, unlocks: ['common', 'uncommon', 'rare', 'epic', 'legendary'] },
+  { level: 1, name: 'Stranger', threshold: 0, discount: 0, unlocks: ['common', 'uncommon'] },
+  {
+    level: 2,
+    name: 'Regular',
+    threshold: 20,
+    discount: 0.1,
+    unlocks: ['common', 'uncommon', 'rare'],
+  },
+  {
+    level: 3,
+    name: 'Friend',
+    threshold: 100,
+    discount: 0.15,
+    unlocks: ['common', 'uncommon', 'rare'],
+  },
+  {
+    level: 4,
+    name: 'Partner',
+    threshold: 300,
+    discount: 0.2,
+    unlocks: ['common', 'uncommon', 'rare', 'epic'],
+  },
+  {
+    level: 5,
+    name: 'Family',
+    threshold: 1000,
+    discount: 0.3,
+    unlocks: ['common', 'uncommon', 'rare', 'epic', 'legendary'],
+  },
 ];
 
 /**
@@ -39,7 +57,7 @@ const TRUST_GREETINGS = {
   1: 'Step right up.',
   2: 'Back for more?',
   3: 'Good to see you, friend.',
-  4: 'Now we\'re talking!',
+  4: "Now we're talking!",
   5: 'Family gets the good stuff.',
 };
 
@@ -89,7 +107,7 @@ export const SHOP_ITEMS = [
     category: 'one_shot',
     rarity: 'epic',
     trustRequired: 4,
-    costPct: 0.60,
+    costPct: 0.6,
     desc: 'Next win doubles your entire bankroll',
     maxCharges: 1,
     stubbed: false,
@@ -136,7 +154,7 @@ export const SHOP_ITEMS = [
     category: 'counter',
     rarity: 'common',
     trustRequired: 1,
-    costPct: 0.30,
+    costPct: 0.3,
     desc: 'Next 5 dead throws become valid throws (auto-redirect)',
     maxCharges: 5,
     stubbed: false,
@@ -148,7 +166,7 @@ export const SHOP_ITEMS = [
   // ═══════════════════════════════════════════════════════════
   {
     id: 'rabbits_foot',
-    name: 'Rabbit\'s Foot',
+    name: "Rabbit's Foot",
     npcId: 'larry',
     category: 'one_shot',
     rarity: 'common',
@@ -166,7 +184,7 @@ export const SHOP_ITEMS = [
     category: 'charges',
     rarity: 'common',
     trustRequired: 1,
-    costPct: 0.20,
+    costPct: 0.2,
     desc: 'On win, 50% chance to double payout (3 uses)',
     maxCharges: 3,
     stubbed: false,
@@ -209,7 +227,7 @@ export const SHOP_ITEMS = [
     category: 'passive',
     rarity: 'common',
     trustRequired: 1,
-    costPct: 0.20,
+    costPct: 0.2,
     desc: 'Earn 5% interest on your money after every resolved hand',
     maxCharges: -1,
     stubbed: false,
@@ -235,7 +253,7 @@ export const SHOP_ITEMS = [
     category: 'passive',
     rarity: 'common',
     trustRequired: 1,
-    costPct: 0.10,
+    costPct: 0.1,
     desc: 'Settle threshold relaxed: V_THRESHOLD 0.08→0.06, SETTLE_TIMEOUT 3s→5s',
     maxCharges: -1,
     stubbed: false,
@@ -252,7 +270,7 @@ export const SHOP_ITEMS = [
     category: 'immediate',
     rarity: 'common',
     trustRequired: 1,
-    costPct: 0.10,
+    costPct: 0.1,
     desc: 'Grants a random charm upgrade with 1 charge — 15% chance it fizzles',
     maxCharges: 0,
     stubbed: false,
@@ -265,7 +283,7 @@ export const SHOP_ITEMS = [
     category: 'immediate',
     rarity: 'rare',
     trustRequired: 1,
-    costPct: 0.20,
+    costPct: 0.2,
     desc: 'Grants a random non-stubbed shop item from any vendor',
     maxCharges: 0,
     stubbed: false,
@@ -282,7 +300,7 @@ export const SHOP_ITEMS = [
     category: 'dice',
     rarity: 'common',
     trustRequired: 1,
-    costPct: 0.20,
+    costPct: 0.2,
     desc: 'Win +50% payout, Loss -25%. Durability 6',
     stubbed: false,
     descStubbed: '',
@@ -295,7 +313,7 @@ export const SHOP_ITEMS = [
     category: 'dice',
     rarity: 'rare',
     trustRequired: 2,
-    costPct: 0.40,
+    costPct: 0.4,
     desc: 'Win 2.5x, shatters on loss. Durability 3',
     stubbed: false,
     descStubbed: '',
@@ -312,7 +330,7 @@ export const SHOP_ITEMS = [
     category: 'dice',
     rarity: 'rare',
     trustRequired: 2,
-    costPct: 0.20,
+    costPct: 0.2,
     desc: 'Win costs ₡1, loss pays ₡1 — purple elder-wood',
     stubbed: false,
     descStubbed: '',
@@ -420,7 +438,7 @@ export const SHOP_ITEMS = [
     category: 'dice',
     rarity: 'rare',
     trustRequired: 2,
-    costPct: 0.30,
+    costPct: 0.3,
     desc: '5% chance instant table clear, 95% lose ₡2. All or nothing. Durability 5',
     stubbed: false,
     descStubbed: '',
@@ -463,9 +481,7 @@ export function calcItemCost(item, tableTarget, trustDiscount) {
 /** Filter shop items by NPC and trust-unlocked rarities */
 export function filterInventory(npcId, unlockedRarities) {
   const raritySet = new Set(unlockedRarities);
-  return SHOP_ITEMS.filter(
-    (item) => item.npcId === npcId && raritySet.has(item.rarity)
-  );
+  return SHOP_ITEMS.filter((item) => item.npcId === npcId && raritySet.has(item.rarity));
 }
 
 // ========== SHOP SYSTEM CLASS ===============================================
@@ -513,12 +529,12 @@ export class ShopSystem {
    * @param {number} tableTarget — current table's money target (for cost calculation)
    * @returns {Array<object>}
    */
-  getInventory(npcId, tableTarget) {
+  getInventory(npcId, _tableTarget) {
     const entry = this._getTrustEntry(npcId);
     const candidates = filterInventory(npcId, entry.unlocks);
 
     // Return up to 4 items, randomly shuffled
-    const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+    const shuffled = shuffle(candidates);
     return shuffled.slice(0, 4);
   }
 
@@ -725,7 +741,10 @@ export class ShopSystem {
 
     // Not enough free slots
     if (candidates.length < slotsNeeded) {
-      return { success: false, reason: item.isPair ? 'Need 2 free slots for loaded set' : 'Dice hand full' };
+      return {
+        success: false,
+        reason: item.isPair ? 'Need 2 free slots for loaded set' : 'Dice hand full',
+      };
     }
 
     // Replace the target slot(s)
@@ -773,11 +792,10 @@ export class ShopSystem {
    */
   _applyCharmRefill(rogueRun) {
     // Find charm-type upgrades the player owns in activeUpgrades
-    const ownedCharms = Array.from(rogueRun.activeUpgrades.entries())
-      .filter(([id]) => {
-        const def = UPGRADES.find((u) => u.id === id);
-        return def && def.category === 'charm';
-      });
+    const ownedCharms = Array.from(rogueRun.activeUpgrades.entries()).filter(([id]) => {
+      const def = UPGRADES.find((u) => u.id === id);
+      return def && def.category === 'charm';
+    });
 
     if (ownedCharms.length === 0) return false;
 
@@ -816,9 +834,7 @@ export class ShopSystem {
    * @returns {{success: boolean, rolledId?: string, rolledItem?: object}}
    */
   _applyMysteryBox(rogueRun) {
-    const candidates = SHOP_ITEMS.filter(
-      (i) => !i.stubbed && i.id !== 'mystery_box'
-    );
+    const candidates = SHOP_ITEMS.filter((i) => !i.stubbed && i.id !== 'mystery_box');
     if (candidates.length === 0) return { success: true };
 
     const rolled = candidates[Math.floor(Math.random() * candidates.length)];
