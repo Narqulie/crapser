@@ -606,6 +606,13 @@ function animate(time) {
     // Keep dice hovering during map (same as idle hover)
     hoverBob += 0.04;
     positionDiceHover(dice, hoverBob);
+  } else if (rogueRun.runState === 'TABLE_START_LOCK') {
+    if (!rogueUI._tableLockMode) {
+      rogueUI.showTableStartLock();
+    }
+    // Keep dice hovering during table-lock selection
+    hoverBob += 0.04;
+    positionDiceHover(dice, hoverBob);
   } else if (isAiming) {
     positionDiceHover(dice);
   } else if (!game.rolling && !rogueRun.isBust && !resultPending) {
