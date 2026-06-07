@@ -308,7 +308,7 @@ function getTint(typeId) {
 
 function applyTint(material, tint) {
   if (tint.color !== undefined) material.color.setHex(tint.color);
-  if (tint.emissive !== undefined) material.emissive.setHex(tint.emissive);
+  if (tint.emissive !== undefined && material.emissive) material.emissive.setHex(tint.emissive);
   if (tint.emissiveIntensity !== undefined) material.emissiveIntensity = tint.emissiveIntensity;
   if (tint.roughness !== undefined) material.roughness = tint.roughness;
   if (tint.metalness !== undefined) material.metalness = tint.metalness;
