@@ -178,8 +178,8 @@ export class DiceHand {
    * @param {string[]} types — array of 4 die type ids
    */
   constructor(types) {
-    this.reset(types);
     this.lockedSlots = new Set();
+    this.reset(types);
   }
 
   /**
