@@ -94,7 +94,6 @@ export class RogueUI {
     this.dicePickConfirm = document.getElementById('dice-pick-confirm');
     this._pickedSlots = [];
     this._tableLockMode = false;
-    this.onTableLockDone = null;
 
     // Map navigation overlay
     this.mapOverlay = document.getElementById('map-overlay');
